@@ -10,7 +10,6 @@ from typing import Type, Union, List, Optional, Callable, Any
 
 import torch
 from torch import Tensor, nn
-from torchvision.models._api import register_model
 from torchvision.models._utils import handle_legacy_interface
 from torchvision.models import resnet
 from torchvision.models.resnet import Bottleneck, WeightsEnum, ResNet18_Weights, BasicBlock
@@ -79,7 +78,6 @@ def _resnet(
     return model
 
 
-@register_model()
 @handle_legacy_interface(weights=("pretrained", ResNet18_Weights.IMAGENET1K_V1))
 def yolov1_resnet18(*, weights: Optional[ResNet18_Weights] = None, progress: bool = True, **kwargs: Any) -> ResNet:
     """ResNet-18 from `Deep Residual Learning for Image Recognition <https://arxiv.org/pdf/1512.03385.pdf>`__.
@@ -115,7 +113,8 @@ if __name__ == '__main__':
     model = yolov1_resnet18(B=2, S=7, num_classes=20, weights=ResNet18_Weights.IMAGENET1K_V1)
     print(model)
 
-    data = torch.randn(1, 3, 224, 224)
+    # data = torch.randn(1, 3, 224, 224)
+    data = torch.randn(1, 3, 448, 448)
     print(data.shape)
 
     res = model(data)
