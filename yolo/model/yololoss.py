@@ -176,7 +176,7 @@ class YOLOv1Loss(nn.Module):
             # intersection over union (IOU) between the predicted box
             # and the ground truth
             #####
-            box_target_iou[i + max_index, torch.LongTensor([4]).cuda()] = (max_iou).data.cuda()
+            box_target_iou[i + max_index, 4] = max_iou
         # 1.response loss
         # 计算响应预测框
         # [N_obj * B, 5] -> [N_obj * 5] -> [N_obj, 5]
@@ -220,6 +220,8 @@ class YOLOv1Loss(nn.Module):
 if __name__ == '__main__':
     m = YOLOv1Loss()
     print(m)
+
+    torch.manual_seed(32)
 
     a = torch.randn(1, 7, 7, 30)
     b = torch.zeros(1, 7, 7, 30)
