@@ -66,7 +66,11 @@ class YOLOv1Loss(nn.Module):
         device = targets.device
 
         # 多少张图片
-        N = preds.size()[0]
+        N = preds.shape[0]
+        # 每个网格多少维度：5*B+N_cls
+        per_grid_dim = preds.shape[-1]
+        grid_dim_for_box = 5 * self.B
+
         # 获取包含目标的网格掩码。在数据预处理时已经把标注框对应网格的边界框置信度设置为1，所以只需要判断第一个边界框置信度是否为1即可
         # [N, S, S, 5*B+N_cls] -> [N, S, S] -> [N, S, S]
         coo_mask = targets[:, :, :, 4] > 0
@@ -81,38 +85,38 @@ class YOLOv1Loss(nn.Module):
 
         # 提取所有符合条件的预测框数据
         # [N, S, S, 5*B+N_cls] -> [N_obj * (5*B+N_cls)] -> [N_obj, 5*b+N_cls]
-        coo_pred = preds[coo_mask].view(-1, 30)
+        coo_pred = preds[coo_mask].reshape(-1, per_grid_dim)
         # 提取对应的边界框信息
         # [N_obj, 5*B+N_cls] -> [N_obj * 5 * B] -> [N_obj * B, 5]
-        box_pred = coo_pred[:, :10].contiguous().view(-1, 5)  # box[x1,y1,w1,h1,c1]
+        box_pred = coo_pred[:, :grid_dim_for_box].reshape(-1, 5)  # box[x1,y1,w1,h1,c1]
         # 提取对应的分类信息
         # [N_obj, 5*B+N_cls] -> [N_obj, N_cls]
-        class_pred = coo_pred[:, 10:]  # [x2,y2,w2,h2,c2]
+        class_pred = coo_pred[:, grid_dim_for_box:]  # [x2,y2,w2,h2,c2]
 
         # 提取所有符合条件的真值框数据
         # [N, S, S, 5*B+N_cls] -> [N_obj * (5*B+N_cls)] -> [N_obj, 5*b+N_cls]
-        coo_target = preds[coo_mask].view(-1, 30)
+        coo_target = preds[coo_mask].reshape(-1, per_grid_dim)
         # 提取对应的边界框信息
         # [N_obj, 5*B+N_cls] -> [N_obj * 5 * B] -> [N_obj * B, 5]
-        box_target = coo_target[:, :10].contiguous().view(-1, 5)
+        box_target = coo_target[:, :grid_dim_for_box].reshape(-1, 5)
         # 提取对应的分类信息
         # [N_obj, 5*B+N_cls] -> [N_obj, N_cls]
-        class_target = coo_target[:, 10:]
+        class_target = coo_target[:, grid_dim_for_box:]
 
         # compute not contain obj loss
         # 计算不包含目标的损失
         # 提取不包含目标的预测框信息
         # [N, S, S, 5*B+N_cls] -> [N_noobj * (5*B+N_cls)] -> [N_noobj, 5*B+N_cls]
-        noo_pred = preds[noo_mask].view(-1, 30)
+        noo_pred = preds[noo_mask].reshape(-1, per_grid_dim)
         # 提取不包含目标的真值框信息
         # [N, S, S, 5*B+N_cls] -> [N_noobj * (5*B+N_cls)] -> [N_noobj, 5*B+N_cls]
-        noo_target = targets[noo_mask].view(-1, 30)
+        noo_target = targets[noo_mask].reshape(-1, per_grid_dim)
         # 创建掩码，目标是提取每个预测框的置信度
         # [N_noobj, 5*B+N_cls]
         noo_pred_mask = torch.zeros(noo_pred.shape, dtype=torch.bool)
         # 每个边界框对应的置信度掩码赋值为1
-        noo_pred_mask[:, 4] = 1
-        noo_pred_mask[:, 9] = 1
+        for bi in range(self.B):
+            noo_pred_mask[:, 5 * bi + 4] = 1
         # 提取每个预测框的置信度
         # [N_noobj, 5*B+N_cls] -> [N_noobj * 2]
         noo_pred_c = noo_pred[noo_pred_mask]  # noo pred只需要计算 c 的损失 size[-1,2]
@@ -136,10 +140,10 @@ class YOLOv1Loss(nn.Module):
         # 创建iou张量，大小设置为[N_obj * B, 5]
         box_target_iou = torch.zeros(box_target.size()).to(device)
         # 遍历每个网格（包含了B个预测框）
-        for i in range(0, box_target.size()[0], 2):  # choose the best iou box
+        for i in range(0, box_target.shape[0], self.B):  # choose the best iou box
             # 获取第i个网格包含的预测框数据
             # [2, 5]
-            box1 = box_pred[i:i + 2]
+            box1 = box_pred[i:i + self.B]
             # 计算预测框坐标x1y1_x2y2（相对于图像宽/高的比例）
             # [2, 5]
             box1_xyxy = torch.zeros(box1.size())
@@ -180,11 +184,11 @@ class YOLOv1Loss(nn.Module):
         # 1.response loss
         # 计算响应预测框
         # [N_obj * B, 5] -> [N_obj * 5] -> [N_obj, 5]
-        box_pred_response = box_pred[coo_response_mask].view(-1, 5)
+        box_pred_response = box_pred[coo_response_mask].reshape(-1, 5)
         # [N_obj * B, 5] -> [N_obj * 5] -> [N_obj, 5]
-        box_target_response_iou = box_target_iou[coo_response_mask].view(-1, 5)
+        box_target_response_iou = box_target_iou[coo_response_mask].reshape(-1, 5)
         # [N_obj * B, 5] -> [N_obj * 5] -> [N_obj, 5]
-        box_target_response = box_target[coo_response_mask].view(-1, 5)
+        box_target_response = box_target[coo_response_mask].reshape(-1, 5)
         # 计算均值平方差损失，目的是优化响应预测框和标注框之间的IoU（target=1）
         contain_loss = F.mse_loss(box_pred_response[:, 4], box_target_response_iou[:, 4], reduction='sum')
         # 计算坐标损失，
@@ -196,19 +200,21 @@ class YOLOv1Loss(nn.Module):
         # 2.not response loss
         # 计算未响应目标的预测框损失
         # [N_obj * B, 5] -> [N_obj * (B-1) * 5] -> [N_obj * (B-1), 5]
-        box_pred_not_response = box_pred[coo_not_response_mask].view(-1, 5)
+        box_pred_not_response = box_pred[coo_not_response_mask].reshape(-1, 5)
         # [N_obj * B, 5] -> [N_obj * (B-1) * 5] -> [N_obj * (B-1), 5]
-        box_target_not_response = box_target[coo_not_response_mask].view(-1, 5)
+        box_target_not_response = box_target[coo_not_response_mask].reshape(-1, 5)
         # 设置未响应预测框的置信度为0
         box_target_not_response[:, 4] = 0
         # not_contain_loss = F.mse_loss(box_pred_response[:,4],box_target_response[:,4],size_average=False)
 
         # I believe this bug is simply a typo
         # 计算置信度损失
+        # [N_obj * (B-1)] x [N_obj * (B-1)] -> [1]
         not_contain_loss = F.mse_loss(box_pred_not_response[:, 4], box_target_not_response[:, 4], reduction='sum')
 
         # 3.class loss
         # 计算分类损失
+        # [N_obj, N_cls] x [N_obj, N_cls] -> [1]
         class_loss = F.mse_loss(class_pred, class_target, reduction='sum')
 
         return (self.co_coord * loc_loss +
@@ -223,12 +229,17 @@ if __name__ == '__main__':
 
     torch.manual_seed(32)
 
-    a = torch.randn(1, 7, 7, 30)
-    b = torch.zeros(1, 7, 7, 30)
-    b[:, 2, 3] = torch.abs(torch.randn(30))
-    b[:, 2, 3, 4] = 1
-    b[:, 2, 3, 9] = 1
-    b[:, 2, 3, 17] = 1
+    B = 2
+    # B = 6
+    S = 7
+    # S = 14
+    N_cls = 20
+    a = torch.randn(1, S, S, 5 * B + N_cls)
+    b = torch.zeros(1, S, S, 5 * B + N_cls)
+    b[:, 2, 3] = torch.abs(torch.randn(5 * B + N_cls))
+    for bi in range(B):
+        b[:, 2, 3, 5 * bi + 4] = 1
+    b[:, 2, 3, 5 * B + 8] = 1
     loss = m(a, b)
     print(loss)
 
