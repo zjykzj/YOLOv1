@@ -1,121 +1,115 @@
 # -*- coding: utf-8 -*-
 
 """
-@date: 2023/3/28 下午3:04
+@date: 2023/3/30 上午11:14
 @file: yolov1.py
 @author: zj
 @description: 
 """
-from typing import Type, Union, List, Optional, Callable, Any
 
 import torch
-from torch import Tensor, nn
-from torchvision.models._utils import handle_legacy_interface
-from torchvision.models import resnet
-from torchvision.models.resnet import Bottleneck, WeightsEnum, ResNet18_Weights, BasicBlock
+import torch.nn as nn
 
 
-class ResNet(resnet.ResNet):
+def conv_bn_act(in_channels: int,
+                out_channels: int,
+                kernel_size=1,
+                stride=1,
+                padding=0,
+                bias=False,
+                is_bn=True,
+                act='relu'):
+    # 定义卷积层
+    conv = nn.Conv2d(in_channels=in_channels, out_channels=out_channels,
+                     kernel_size=kernel_size, stride=stride, padding=padding, bias=bias)
 
-    def __init__(self, block: Type[Union[BasicBlock, Bottleneck]], layers: List[int], num_classes: int = 1000,
-                 zero_init_residual: bool = False, groups: int = 1, width_per_group: int = 64,
-                 replace_stride_with_dilation: Optional[List[bool]] = None,
-                 norm_layer: Optional[Callable[..., nn.Module]] = None, B=2, S=7) -> None:
-        super().__init__(block, layers, num_classes, zero_init_residual, groups, width_per_group,
-                         replace_stride_with_dilation, norm_layer)
+    # 定义归一化层
+    if is_bn:
+        norm = nn.BatchNorm2d(num_features=out_channels)
+    else:
+        norm = nn.Identity()
 
-        self.B = B
-        self.S = S
-        self.fc = nn.Linear(512 * block.expansion, (num_classes + 5 * self.B) * self.S * self.S)
+    # 定义激活层
+    if 'relu' == act:
+        activation = nn.ReLU(inplace=True)
+    else:
+        activation = nn.LeakyReLU(negative_slope=0.1, inplace=True)
+
+    # 返回一个 nn.Sequential 对象，按顺序组合卷积层、归一化层和激活层
+    return nn.Sequential(
+        conv,
+        norm,
+        activation
+    )
+
+
+class YOLOv1(nn.Module):
+    def __init__(self, num_classes=20, S=7, B=2):
+        super(YOLOv1, self).__init__()
+
         self.num_classes = num_classes
+        self.S = S  # 特征图大小
+        self.B = B  # 每个网格单元预测的边界框数量
+        self.C = num_classes  # 对象类别数量
 
-    def _make_layer(self, block: Type[Union[BasicBlock, Bottleneck]], planes: int, blocks: int, stride: int = 1,
-                    dilate: bool = False) -> nn.Sequential:
-        return super()._make_layer(block, planes, blocks, stride, dilate)
+        self.features = nn.Sequential(
+            conv_bn_act(3, 64, kernel_size=7, stride=2, padding=3, bias=False, is_bn=True, act='leaky_relu'),
+            nn.MaxPool2d(kernel_size=2, stride=2),
 
-    def _forward_impl(self, x: Tensor) -> Tensor:
-        # return super()._forward_impl(x)
-        # See note [TorchScript super()]
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-        x = self.maxpool(x)
+            conv_bn_act(64, 192, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+            nn.MaxPool2d(kernel_size=2, stride=2),
 
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
+            conv_bn_act(192, 128, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
+            conv_bn_act(128, 256, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+            conv_bn_act(256, 256, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
+            conv_bn_act(256, 512, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+            nn.MaxPool2d(kernel_size=2, stride=2),
 
-        x = self.avgpool(x)
-        x = torch.flatten(x, 1)
+            conv_bn_act(512, 256, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
+            conv_bn_act(256, 512, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+            conv_bn_act(512, 256, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
+            conv_bn_act(256, 512, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+            conv_bn_act(512, 256, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
+            conv_bn_act(256, 512, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+            conv_bn_act(512, 256, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
+            conv_bn_act(256, 512, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+            conv_bn_act(512, 512, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
+            conv_bn_act(512, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+
+            conv_bn_act(1024, 512, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
+            conv_bn_act(512, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+            conv_bn_act(1024, 512, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
+            conv_bn_act(512, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+            conv_bn_act(1024, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+            conv_bn_act(1024, 1024, kernel_size=3, stride=2, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+
+            conv_bn_act(1024, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+            conv_bn_act(1024, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+        )
+
+        self.fc = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(1024 * self.S * self.S, 4096),
+            nn.LeakyReLU(0.1, inplace=True),
+            nn.Dropout(),
+            nn.Linear(4096, self.S * self.S * (self.B * 5 + self.C))
+        )
+
+    def forward(self, x):
+        x = self.features(x)
         x = self.fc(x)
 
-        return x.view(-1, self.S, self.S, self.num_classes + 5 * self.B)
-
-    def forward(self, x: Tensor) -> Tensor:
-        # return super().forward(x)
-        return self._forward_impl(x)
-
-
-def _resnet(
-        block: Type[Union[BasicBlock, Bottleneck]],
-        layers: List[int],
-        weights: Optional[WeightsEnum],
-        progress: bool,
-        **kwargs: Any,
-) -> ResNet:
-    # if weights is not None:
-    #     _ovewrite_named_param(kwargs, "num_classes", len(weights.meta["categories"]))
-
-    model = ResNet(block, layers, **kwargs)
-
-    if weights is not None:
-        ckpt = weights.get_state_dict(progress=progress)
-        ckpt.pop('fc.weight')
-        ckpt.pop('fc.bias')
-        model.load_state_dict(ckpt, strict=False)
-
-    return model
-
-
-@handle_legacy_interface(weights=("pretrained", ResNet18_Weights.IMAGENET1K_V1))
-def yolov1_resnet18(*, weights: Optional[ResNet18_Weights] = None, progress: bool = True, **kwargs: Any) -> ResNet:
-    """ResNet-18 from `Deep Residual Learning for Image Recognition <https://arxiv.org/pdf/1512.03385.pdf>`__.
-
-    Args:
-        weights (:class:`~torchvision.models.ResNet18_Weights`, optional): The
-            pretrained weights to use. See
-            :class:`~torchvision.models.ResNet18_Weights` below for
-            more details, and possible values. By default, no pre-trained
-            weights are used.
-        progress (bool, optional): If True, displays a progress bar of the
-            download to stderr. Default is True.
-        **kwargs: parameters passed to the ``torchvision.models.resnet.ResNet``
-            base class. Please refer to the `source code
-            <https://github.com/pytorch/vision/blob/main/torchvision/models/resnet.py>`_
-            for more details about this class.
-
-    .. autoclass:: torchvision.models.ResNet18_Weights
-        :members:
-    """
-    weights = ResNet18_Weights.verify(weights)
-
-    return _resnet(BasicBlock, [2, 2, 2, 2], weights, progress, **kwargs)
+        return x.reshape(-1, self.S, self.S, self.B * 5 + self.C)
 
 
 if __name__ == '__main__':
-    # weights = ResNet18_Weights.IMAGENET1K_V1
-    # weights = ResNet18_Weights.verify(weights)
-    #
-    # model = _resnet(BasicBlock, [2, 2, 2, 2], weights, True, num_classes=20, B=2, S=7)
-    # print(model)
-
-    model = yolov1_resnet18(B=2, S=7, num_classes=20, weights=ResNet18_Weights.IMAGENET1K_V1)
-    print(model)
-
-    # data = torch.randn(1, 3, 224, 224)
     data = torch.randn(1, 3, 448, 448)
-    print(data.shape)
+    model = YOLOv1(S=7)
+    outputs = model(data)
+    print(outputs.shape)
 
-    res = model(data)
-    print(res.shape)
+    data = torch.randn(1, 3, 224, 224)
+    model = YOLOv1(S=4)
+    outputs = model(data)
+    print(outputs.shape)

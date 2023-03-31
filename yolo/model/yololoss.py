@@ -1,226 +1,165 @@
 # -*- coding: utf-8 -*-
 
 """
-@date: 2023/3/29 下午3:15
-@file: yololoss.py
+@date: 2023/3/30 下午4:59
+@file: loss_zj.py
 @author: zj
 @description: 
 """
 
 import torch
-from torch import Tensor
 from torch import nn
 import torch.nn.functional as F
 
 
-def compute_iou(box1, box2):
-    '''Compute the intersection over union of two set of boxes, each box is [x1,y1,x2,y2].
-    Args:
-      box1: (tensor) bounding boxes, sized [N,4].
-      box2: (tensor) bounding boxes, sized [M,4].
-    Return:
-      (tensor) iou, sized [N,M].
-    '''
-    N = box1.size(0)
-    M = box2.size(0)
+def bbox_iou(boxes1, boxes2):
+    assert len(boxes1.shape) == 2, boxes1
+    assert len(boxes2.shape) == 2, boxes2
+    # boxes1 shape: (N, 4)
+    # boxes2 shape: (M, 4)
+    N = boxes1.size(0)
+    M = boxes2.size(0)
 
-    lt = torch.max(
-        box1[:, :2].unsqueeze(1).expand(N, M, 2),  # [N,2] -> [N,1,2] -> [N,M,2]
-        box2[:, :2].unsqueeze(0).expand(N, M, 2),  # [M,2] -> [1,M,2] -> [N,M,2]
-    )
+    lt = torch.max(boxes1[:, :2].unsqueeze(1).expand(N, M, 2),
+                   boxes2[:, :2].unsqueeze(0).expand(N, M, 2))
+    rb = torch.min(boxes1[:, 2:].unsqueeze(1).expand(N, M, 2),
+                   boxes2[:, 2:].unsqueeze(0).expand(N, M, 2))
 
-    rb = torch.min(
-        box1[:, 2:].unsqueeze(1).expand(N, M, 2),  # [N,2] -> [N,1,2] -> [N,M,2]
-        box2[:, 2:].unsqueeze(0).expand(N, M, 2),  # [M,2] -> [1,M,2] -> [N,M,2]
-    )
+    wh = (rb - lt).clamp(min=0)
+    inter = wh[:, :, 0] * wh[:, :, 1]
 
-    wh = rb - lt  # [N,M,2]
-    wh[wh < 0] = 0  # clip at 0
-    inter = wh[:, :, 0] * wh[:, :, 1]  # [N,M]
+    area1 = (boxes1[:, 2] - boxes1[:, 0]) * (boxes1[:, 3] - boxes1[:, 1])
+    area2 = (boxes2[:, 2] - boxes2[:, 0]) * (boxes2[:, 3] - boxes2[:, 1])
 
-    area1 = (box1[:, 2] - box1[:, 0]) * (box1[:, 3] - box1[:, 1])  # [N,]
-    area2 = (box2[:, 2] - box2[:, 0]) * (box2[:, 3] - box2[:, 1])  # [M,]
-    area1 = area1.unsqueeze(1).expand_as(inter)  # [N,] -> [N,1] -> [N,M]
-    area2 = area2.unsqueeze(0).expand_as(inter)  # [M,] -> [1,M] -> [N,M]
+    # [N, M]
+    iou = inter / (area1.unsqueeze(1) + area2.unsqueeze(0) - inter)
 
-    iou = inter / (area1 + area2 - inter)
     return iou
 
 
 class YOLOv1Loss(nn.Module):
-
-    def __init__(self, num_classes=20, B=2, S=7, co_coord=5, co_noobj=0.5):
-        super().__init__()
-        self.num_classes = num_classes
-        self.B = B
+    def __init__(self, S=7, B=2, C=20, lambda_coord=5.0, lambda_obj=1.0, lambda_noobj=0.5, lambda_class=1.0):
+        super(YOLOv1Loss, self).__init__()
         self.S = S
-        self.co_coord = co_coord
-        self.co_noobj = co_noobj
+        self.B = B
+        self.C = C
+        self.lambda_coord = lambda_coord
+        self.lambda_obj = lambda_obj
+        self.lambda_noobj = lambda_noobj
+        self.lambda_class = lambda_class
 
-    def forward(self, preds: Tensor, targets: Tensor):
-        """
-        :param preds: [N, S, S, B*5+num_classes]
-        :param targets: [N, S, S, B*5+num_classes]
-        :return:
-        """
-        device = targets.device
+    def forward(self, predictions, targets):
+        # predictions shape: (batch_size, S, S, (B*5+C))
+        # targets shape: (batch_size, S, S, (B*5+C))
+        assert predictions.shape == targets.shape
 
-        # 多少张图片
-        N = preds.shape[0]
-        # 每个网格多少维度：5*B+N_cls
-        per_grid_dim = preds.shape[-1]
-        grid_dim_for_box = 5 * self.B
+        device = predictions.device
 
-        # 获取包含目标的网格掩码。在数据预处理时已经把标注框对应网格的边界框置信度设置为1，所以只需要判断第一个边界框置信度是否为1即可
-        # [N, S, S, 5*B+N_cls] -> [N, S, S] -> [N, S, S]
-        coo_mask = targets[:, :, :, 4] > 0
-        # 同样的，判断第一个边界框置信度是否为0即可
-        # [N, S, S, 5*B+N_cls] -> [N, S, S] -> [N, S, S]
-        noo_mask = targets[:, :, :, 4] == 0
-        # 扩展到输入数据大小，这样，标注框对应网格的所有数据均可以保留
-        # [N, S, S] -> [N, S, S, 1] -> [N, S, S, 5*B+N_cls]
-        coo_mask = coo_mask.unsqueeze(-1).expand_as(targets)
-        # [N, S, S] -> [N, S, S, 1] -> [N, S, S, 5*B+N_cls]
-        noo_mask = noo_mask.unsqueeze(-1).expand_as(targets)
+        N = len(predictions)
+        assert self.S == predictions.shape[2] and self.S == predictions.shape[2]
+        assert (self.B * 5 + self.C) == predictions.shape[-1]
 
-        # 提取所有符合条件的预测框数据
-        # [N, S, S, 5*B+N_cls] -> [N_obj * (5*B+N_cls)] -> [N_obj, 5*b+N_cls]
-        coo_pred = preds[coo_mask].reshape(-1, per_grid_dim)
-        # 提取对应的边界框信息
-        # [N_obj, 5*B+N_cls] -> [N_obj * 5 * B] -> [N_obj * B, 5]
-        box_pred = coo_pred[:, :grid_dim_for_box].reshape(-1, 5)  # box[x1,y1,w1,h1,c1]
-        # 提取对应的分类信息
-        # [N_obj, 5*B+N_cls] -> [N_obj, N_cls]
-        class_pred = coo_pred[:, grid_dim_for_box:]  # [x2,y2,w2,h2,c2]
+        # extract predicted objectness scores, predicted bounding boxes, and predicted class probabilities
+        # [N, S, S, B]
+        pred_conf = predictions[..., self.B * 4:self.B * 5]
+        # [N, S, S, B*4] -> [N, S, S, B, 4]
+        pred_boxes = predictions[..., :self.B * 4].reshape(N, self.S, self.S, self.B, 4)
+        # [N, S, S, C]
+        pred_class = predictions[..., self.B * 5:]
+        # extract target objectness scores, target bounding boxes, and target class probabilities
+        target_conf = targets[..., self.B * 4:self.B * 5]
+        target_boxes = targets[..., :self.B * 4].reshape(N, self.S, self.S, self.B, 4)
+        target_class = targets[..., self.B * 5:]
 
-        # 提取所有符合条件的真值框数据
-        # [N, S, S, 5*B+N_cls] -> [N_obj * (5*B+N_cls)] -> [N_obj, 5*b+N_cls]
-        coo_target = preds[coo_mask].reshape(-1, per_grid_dim)
-        # 提取对应的边界框信息
-        # [N_obj, 5*B+N_cls] -> [N_obj * 5 * B] -> [N_obj * B, 5]
-        box_target = coo_target[:, :grid_dim_for_box].reshape(-1, 5)
-        # 提取对应的分类信息
-        # [N_obj, 5*B+N_cls] -> [N_obj, N_cls]
-        class_target = coo_target[:, grid_dim_for_box:]
+        # Compute the binary mask for the presence of objects in each grid cell.
+        # [N, S, S, B]
+        obj_mask = target_conf.clone()
+        obj_mask[obj_mask > 0] = 1
+        obj_mask[obj_mask <= 0] = 0
 
-        # compute not contain obj loss
-        # 计算不包含目标的损失
-        # 提取不包含目标的预测框信息
-        # [N, S, S, 5*B+N_cls] -> [N_noobj * (5*B+N_cls)] -> [N_noobj, 5*B+N_cls]
-        noo_pred = preds[noo_mask].reshape(-1, per_grid_dim)
-        # 提取不包含目标的真值框信息
-        # [N, S, S, 5*B+N_cls] -> [N_noobj * (5*B+N_cls)] -> [N_noobj, 5*B+N_cls]
-        noo_target = targets[noo_mask].reshape(-1, per_grid_dim)
-        # 创建掩码，目标是提取每个预测框的置信度
-        # [N_noobj, 5*B+N_cls]
-        noo_pred_mask = torch.zeros(noo_pred.shape, dtype=torch.bool)
-        # 每个边界框对应的置信度掩码赋值为1
-        for bi in range(self.B):
-            noo_pred_mask[:, 5 * bi + 4] = 1
-        # 提取每个预测框的置信度
-        # [N_noobj, 5*B+N_cls] -> [N_noobj * 2]
-        noo_pred_c = noo_pred[noo_pred_mask]  # noo pred只需要计算 c 的损失 size[-1,2]
-        # 提取每个标注框的置信度（应该为0，因为不包含目标）
-        # [N_noobj, 5*B+N_cls] -> [N_noobj * 2]
-        noo_target_c = noo_target[noo_pred_mask]
-        # 计算均值平方差损失，目标是优化不包含目标的预测框置信度为0
-        nooobj_loss = F.mse_loss(noo_pred_c, noo_target_c, reduction='sum')
+        # Compute the binary mask for the absence of objects in each grid cell.
+        # [N, S, S, B]
+        noobj_mask = 1 - obj_mask
 
-        # compute contain obj loss
-        # 计算包含目标的损失，包括
-        # 1. 同一个网格中响应框的预测框损失和置信度损失，
-        # 2. 同一个网格中不响应框的置信度损失，
-        # 3. 包含目标的网格分类损失。
-        # 创建响应掩码
-        # [N_obj * B, 5]
-        coo_response_mask = torch.zeros(box_target.shape, dtype=bool)
-        # 创建不相应掩码
-        # [N_obj * B, 5]
-        coo_not_response_mask = torch.zeros(box_target.shape, dtype=bool)
-        # 创建iou张量，大小设置为[N_obj * B, 5]
-        box_target_iou = torch.zeros(box_target.size()).to(device)
-        # 遍历每个网格（包含了B个预测框）
-        for i in range(0, box_target.shape[0], self.B):  # choose the best iou box
-            # 获取第i个网格包含的预测框数据
-            # [2, 5]
-            box1 = box_pred[i:i + self.B]
-            # 计算预测框坐标x1y1_x2y2（相对于图像宽/高的比例）
-            # [2, 5]
-            box1_xyxy = torch.zeros(box1.size())
-            # 这里应该是有问题的？代码的目标应该是将预测框坐标转换成为x1y1_x2y2形式
-            # 根据计算公式，
-            # 1. 预测框前两位表示xc/yc相对于网格的比例，所以乘以1/14，表示恢复到相对于图像宽/高的比例
-            # 2. u预测框后两位表示w/h相对于图像宽/高的比例
-            # 所以计算结果是预测框左上角坐标和右下角坐标（相对于图像宽/高的比例）
-            # 标注框的计算同理，但实际上，坐标信息的前两位表示的是预测框中心点与对应网格左上角坐标的偏移比例
-            # 也就是说，
-            # 想要计算预测框的左上角坐标，需要加上对应网格的左上角坐标，再乘以单个网格相对于图像的比例，
-            # 才是预测框中心点对应于图像宽/高的比例
-            box1_xyxy[:, :2] = box1[:, :2] / 14. - 0.5 * box1[:, 2:4]
-            box1_xyxy[:, 2:4] = box1[:, :2] / 14. + 0.5 * box1[:, 2:4]
-            # 获取该网格对应标注框数据
-            # [1, 5]
-            box2 = box_target[i].view(-1, 5)
-            # 计算标注框坐标x1y1_x2y2（相对于图像宽/高的比例）
-            # [1, 5]
-            box2_xyxy = torch.zeros(box2.size())
-            box2_xyxy[:, :2] = box2[:, :2] / 14. - 0.5 * box2[:, 2:4]
-            box2_xyxy[:, 2:4] = box2[:, :2] / 14. + 0.5 * box2[:, 2:4]
-            # 计算预测框和对应标注框的IoU
-            # [2, 5], [1, 5] -> [2, 1]
-            iou = compute_iou(box1_xyxy[:, :4], box2_xyxy[:, :4])  # [2,1]
-            max_iou, max_index = iou.max(0)
+        # 计算损失如下：
+        # 1. 包含标注框的网格中响应框的坐标损失
+        # 2. 包含标注框的网格中响应框的置信度损失
+        # 3. 包含标注框的网格中不响应框的置信度损失
+        # 4. 不包含标注框的网格对应预测框的置信度损失
+        # 5. 包含标注框的网格分类损失
+        loss_for_coord = 0.
+        loss_for_response = 0.
+        loss_for_noresponse = 0.
+        loss_for_noobj = 0.
+        loss_for_cls = 0.
 
-            # IoU最大的预测框设置为响应，另一个设置为不响应
-            coo_response_mask[i + max_index] = 1
-            coo_not_response_mask[i + 1 - max_index] = 1
+        cell_size = 1. / self.S
 
-            #####
-            # we want the confidence score to equal the
-            # intersection over union (IOU) between the predicted box
-            # and the ground truth
-            #####
-            box_target_iou[i + max_index, 4] = max_iou
-        # 1.response loss
-        # 计算响应预测框
-        # [N_obj * B, 5] -> [N_obj * 5] -> [N_obj, 5]
-        box_pred_response = box_pred[coo_response_mask].reshape(-1, 5)
-        # [N_obj * B, 5] -> [N_obj * 5] -> [N_obj, 5]
-        box_target_response_iou = box_target_iou[coo_response_mask].reshape(-1, 5)
-        # [N_obj * B, 5] -> [N_obj * 5] -> [N_obj, 5]
-        box_target_response = box_target[coo_response_mask].reshape(-1, 5)
-        # 计算均值平方差损失，目的是优化响应预测框和标注框之间的IoU（target=1）
-        contain_loss = F.mse_loss(box_pred_response[:, 4], box_target_response_iou[:, 4], reduction='sum')
-        # 计算坐标损失，
-        # 1. 对于中心点坐标，直接计算均值平方差损失
-        # 2. 对于长宽，先进行平方根，平滑小目标和大目标对于相同偏差距离带来的不同影响，然后计算均值平方差损失
-        loc_loss = F.mse_loss(box_pred_response[:, :2], box_target_response[:, :2], reduction='sum') + \
-                   F.mse_loss(torch.sqrt(box_pred_response[:, 2:4]), torch.sqrt(box_target_response[:, 2:4]),
-                              reduction='sum')
-        # 2.not response loss
-        # 计算未响应目标的预测框损失
-        # [N_obj * B, 5] -> [N_obj * (B-1) * 5] -> [N_obj * (B-1), 5]
-        box_pred_not_response = box_pred[coo_not_response_mask].reshape(-1, 5)
-        # [N_obj * B, 5] -> [N_obj * (B-1) * 5] -> [N_obj * (B-1), 5]
-        box_target_not_response = box_target[coo_not_response_mask].reshape(-1, 5)
-        # 设置未响应预测框的置信度为0
-        box_target_not_response[:, 4] = 0
-        # not_contain_loss = F.mse_loss(box_pred_response[:,4],box_target_response[:,4],size_average=False)
+        # 遍历图像
+        for ni in range(N):
+            # 遍历网格
+            for i in range(self.S):
+                for j in range(self.S):
+                    # 判断该网格是否包含标注框
+                    if obj_mask[ni, i, j, 0] == 1:
+                        # 计算IoU，IoU最大的设置为响应框，负责预测标注框
+                        # [B, 4]: [xc_offset, yc_offset, box_w, box_h]
+                        pred_grid_boxes = pred_boxes[ni, i, j]
+                        pred_xc = (pred_grid_boxes[:, 0] + i) * cell_size
+                        pred_yc = (pred_grid_boxes[:, 1] + j) * cell_size
+                        pred_w = pred_grid_boxes[:, 2]
+                        pred_h = pred_grid_boxes[:, 3]
 
-        # I believe this bug is simply a typo
-        # 计算置信度损失
-        # [N_obj * (B-1)] x [N_obj * (B-1)] -> [1]
-        not_contain_loss = F.mse_loss(box_pred_not_response[:, 4], box_target_not_response[:, 4], reduction='sum')
+                        pred_x1 = pred_xc - 0.5 * pred_w
+                        pred_y1 = pred_yc - 0.5 * pred_h
+                        pred_x2 = pred_xc + 0.5 * pred_w
+                        pred_y2 = pred_yc + 0.5 * pred_h
 
-        # 3.class loss
-        # 计算分类损失
-        # [N_obj, N_cls] x [N_obj, N_cls] -> [1]
-        class_loss = F.mse_loss(class_pred, class_target, reduction='sum')
+                        # [1, 4]
+                        target_grid_boxes = target_boxes[ni, i, j, 0].unsqueeze(0)
+                        target_xc = (target_grid_boxes[:, 0] + i) * cell_size
+                        target_yc = (target_grid_boxes[:, 1] + j) * cell_size
+                        target_w = target_grid_boxes[:, 2]
+                        target_h = target_grid_boxes[:, 3]
 
-        return (self.co_coord * loc_loss +
-                contain_loss +
-                self.co_noobj * not_contain_loss + self.co_noobj * nooobj_loss +
-                class_loss) / N
+                        target_x1 = target_xc - 0.5 * target_w
+                        target_y1 = target_yc - 0.5 * target_h
+                        target_x2 = target_xc + 0.5 * target_w
+                        target_y2 = target_yc + 0.5 * target_h
+
+                        # iou([B, 4], [1, 4]) -> [B, 1]
+                        ious = bbox_iou(
+                            torch.concat((pred_x1, pred_y1, pred_x2, pred_y2)).reshape(self.B, 4),
+                            torch.concat((target_x1, target_y1, target_x2, target_y2)).reshape(1, 4)
+                        )
+                        max_iou_id = torch.argmax(ious).detach().cpu().item()
+
+                        for bi in range(self.B):
+                            if bi == max_iou_id:
+                                # 计算响应框置信度损失
+                                loss_for_response += (pred_conf[ni, i, j, max_iou_id] - 1.) ** 2
+
+                                # 计算坐标损失
+                                loss_for_coord += F.mse_loss(pred_boxes[ni, i, j, max_iou_id],
+                                                             target_boxes[ni, i, j, max_iou_id], reduction='sum')
+                            else:
+                                # 计算不响应框置信度损失
+                                loss_for_noresponse += (pred_conf[ni, i, j, bi] - 0.) ** 2
+
+                        # 计算网格分类损失
+                        loss_for_cls += F.mse_loss(pred_class[ni, i, j], target_class[ni, i, j], reduction='sum')
+                    else:
+                        # 不包含标注框，仅计算置信度损失
+                        loss_for_noobj += F.mse_loss(pred_conf[ni, i, j],
+                                                     torch.zeros(target_conf[ni, i, j].shape).to(device),
+                                                     reduction='sum')
+
+        loss = self.lambda_coord * loss_for_coord + \
+               self.lambda_obj * loss_for_response + \
+               self.lambda_noobj * loss_for_noresponse + \
+               self.lambda_noobj * loss_for_noobj + \
+               self.lambda_class * loss_for_cls
+        return loss / N
 
 
 if __name__ == '__main__':
@@ -230,9 +169,7 @@ if __name__ == '__main__':
     torch.manual_seed(32)
 
     B = 2
-    # B = 6
     S = 7
-    # S = 14
     N_cls = 20
     a = torch.randn(1, S, S, 5 * B + N_cls)
     b = torch.zeros(1, S, S, 5 * B + N_cls)
@@ -246,3 +183,12 @@ if __name__ == '__main__':
     m = m.cuda()
     loss = m(a.cuda(), b.cuda())
     print(loss)
+
+    # a = torch.abs(torch.randn(3, 4)) * 100
+    # # b = torch.abs(torch.randn(4, 4)) * 100
+    # b = torch.abs(torch.randn(1, 4)) * 100
+    # c = bbox_iou(a, b)
+    # print(c.shape)
+    # print(c)
+    #
+    # print(torch.argmax(c, dim=1))

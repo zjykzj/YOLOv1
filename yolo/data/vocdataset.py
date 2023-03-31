@@ -19,7 +19,7 @@ from torch.utils.data.dataset import T_co
 
 class VOCDataset(Dataset):
 
-    def __init__(self, root, name, transform=None, target_transform=None, B=2, S=7, target_size=224):
+    def __init__(self, root, name, transform=None, target_transform=None, B=2, S=7, target_size=448):
         self.root = root
         self.name = name
         self.transform = transform
@@ -44,12 +44,14 @@ class VOCDataset(Dataset):
 
             sub_box_list = list()
             sub_label_list = list()
+            # [[cls_id, x_center, y_center, box_w, box_h], ]
+            # The coordinate size is relative to the width and height of the image
             boxes = np.loadtxt(label_path, delimiter=' ', dtype=float)
             if len(boxes.shape) == 1:
                 boxes = [boxes]
             for label, xc, yc, box_w, box_h in boxes:
                 sub_box_list.append([xc, yc, box_w, box_h])
-                sub_label_list.append(label + 1)
+                sub_label_list.append(int(label))
             box_list.append(sub_box_list)
             label_list.append(sub_label_list)
 
@@ -89,32 +91,21 @@ class VOCDataset(Dataset):
         # 计算单个网格的长宽
         cell_size = 1 / self.S
         for i in range(len(boxes)):
-            xc_yc = boxes[i][:2]
-            box_wh = boxes[i][2:4]
-            # 计算标注框中心点位于哪个网格
-            ij_grid = np.ceil(np.array(xc_yc) / cell_size) - 1
+            xc, yc, box_w, box_h = boxes[i][:4]
+            x_idx, y_idx = int(xc // cell_size), int(yc // cell_size)
+            x_offset, y_offset = xc / cell_size - x_idx, yc / cell_size - y_idx
+            class_onehot = torch.zeros(self.num_classes)
+            class_onehot[labels[i]] = 1
             for bi in range(self.B):
-                # 网格对应标注框置信度conf设置为1
-                target[int(ij_grid[1]), int(ij_grid[0]), 5 * bi - 1 + 5] = 1
-            # 指定网格的指定类别设置为1
-            target[int(ij_grid[1]), int(ij_grid[0]), 5 * self.B - 1 + int(labels[i])] = 1
+                if target[y_idx, x_idx, bi * 5 + 4] == 1:
+                    break
 
-            # 计算中心点所在网格的长宽（相对于图像大小）
-            xy_grid = ij_grid * cell_size
-            # 计算中心点和对应网格左上角的偏移比例（相对于网格大小）
-            frac_xy = (xc_yc - xy_grid) / cell_size
-            for bi in range(self.B):
-                # 网格对应标注框的真值坐标设置为
-                # [
-                # box_xc与对应网格左上角的偏移比例（相对于网格大小），
-                # box_yc与对应网格左上角的偏移比例（相对于网格大小），
-                # box_w与图像宽的比例（相对于图像宽），
-                # box_h与图像高的比例（相对于图像高）
-                # ]
-                target[int(ij_grid[1]), int(ij_grid[0]), (5 * bi - 1 + 1):(5 * bi - 1 + 3)] = \
-                    torch.from_numpy(np.array(frac_xy))
-                target[int(ij_grid[1]), int(ij_grid[0]), (5 * bi - 1 + 3):(5 * bi - 1 + 5)] = \
-                    torch.from_numpy(np.array(box_wh))
+                target[y_idx, x_idx, bi * 4:(bi + 1) * 4] = \
+                    torch.from_numpy(np.array([x_offset, y_offset, box_w, box_h]))
+                target[y_idx, x_idx, self.B * 4 + bi] = 1.
+                # target[y_idx, x_idx, bi * 5:(bi + 1) * 5] = \
+                #     torch.from_numpy(np.array([x_offset, y_offset, box_w, box_h, 1]))
+                target[y_idx, x_idx, 5 * self.B:] = class_onehot
 
         return target
 
