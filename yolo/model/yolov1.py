@@ -43,6 +43,54 @@ def conv_bn_act(in_channels: int,
     )
 
 
+class FastYOLOv1(nn.Module):
+    def __init__(self, num_classes=20, S=7, B=2):
+        super(FastYOLOv1, self).__init__()
+
+        self.num_classes = num_classes
+        self.S = S  # 特征图大小
+        self.B = B  # 每个网格单元预测的边界框数量
+        self.C = num_classes  # 对象类别数量
+
+        self.features = nn.Sequential(
+            conv_bn_act(3, 16, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+
+            conv_bn_act(16, 32, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+
+            conv_bn_act(32, 64, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+
+            conv_bn_act(64, 128, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+
+            conv_bn_act(128, 256, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+
+            conv_bn_act(256, 512, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+
+            conv_bn_act(512, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+            conv_bn_act(1024, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+            conv_bn_act(1024, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+        )
+
+        self.fc = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(1024 * self.S * self.S, 4096),
+            nn.LeakyReLU(0.1, inplace=True),
+            nn.Dropout(p=0.5),
+            nn.Linear(4096, self.S * self.S * (self.B * 5 + self.C))
+        )
+
+    def forward(self, x):
+        x = self.features(x)
+        x = self.fc(x)
+
+        return x.reshape(-1, self.S, self.S, self.B * 5 + self.C)
+
+
 class YOLOv1(nn.Module):
     def __init__(self, num_classes=20, S=7, B=2):
         super(YOLOv1, self).__init__()
@@ -104,10 +152,20 @@ class YOLOv1(nn.Module):
 
 
 if __name__ == '__main__':
-    data = torch.randn(1, 3, 448, 448)
-    model = YOLOv1(S=7)
-    outputs = model(data)
-    print(outputs.shape)
+    # data = torch.randn(1, 3, 448, 448)
+    # model = YOLOv1(S=7)
+    # outputs = model(data)
+    # print(outputs.shape)
+    #
+    # data = torch.randn(1, 3, 224, 224)
+    # model = YOLOv1(S=4)
+    # outputs = model(data)
+    # print(outputs.shape)
+
+    # data = torch.randn(1, 3, 448, 448)
+    # model = FastYOLOv1(S=7)
+    # outputs = model(data)
+    # print(outputs.shape)
 
     data = torch.randn(1, 3, 224, 224)
     model = YOLOv1(S=4)
