@@ -155,7 +155,7 @@ class YOLOv1(nn.Module):
             nn.Flatten(),
             nn.Linear(1024 * self.S * self.S, 4096),
             nn.LeakyReLU(0.1, inplace=True),
-            nn.Dropout(),
+            nn.Dropout(p=0.5),
             nn.Linear(4096, self.S * self.S * (self.B * 5 + self.C))
         )
 
