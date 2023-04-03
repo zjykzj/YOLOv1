@@ -7,8 +7,9 @@
 @description: 
 """
 import os
-
-import PIL.Image
+import cv2
+import random
+from PIL import Image
 import glob
 
 import numpy as np
@@ -19,9 +20,10 @@ from torch.utils.data.dataset import T_co
 
 class VOCDataset(Dataset):
 
-    def __init__(self, root, name, transform=None, target_transform=None, B=2, S=7, target_size=448):
+    def __init__(self, root, name, train=True, transform=None, target_transform=None, B=2, S=7, target_size=448):
         self.root = root
         self.name = name
+        self.train = train
         self.transform = transform
         self.target_transform = target_transform
         self.B = B
@@ -52,10 +54,10 @@ class VOCDataset(Dataset):
             for label, xc, yc, box_w, box_h in boxes:
                 sub_box_list.append([xc, yc, box_w, box_h])
                 sub_label_list.append(int(label))
-            box_list.append(sub_box_list)
+            box_list.append(np.array(sub_box_list))
             label_list.append(sub_label_list)
 
-        self.box_list = box_list
+        self.box_list = np.array(box_list, dtype=object)
         self.label_list = label_list
         self.num_classes = 20
 
@@ -66,12 +68,83 @@ class VOCDataset(Dataset):
             transforms.Normalize(mean=[0.471, 0.448, 0.408], std=[0.234, 0.239, 0.242])
         ])
 
+    def BGR2RGB(self, img):
+        return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+    def BGR2HSV(self, img):
+        return cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+
+    def HSV2BGR(self, img):
+        return cv2.cvtColor(img, cv2.COLOR_HSV2BGR)
+
+    def RandomBrightness(self, bgr):
+        if random.random() < 0.5:
+            hsv = self.BGR2HSV(bgr)
+            h, s, v = cv2.split(hsv)
+            adjust = random.choice([0.5, 1.5])
+            v = v * adjust
+            v = np.clip(v, 0, 255).astype(hsv.dtype)
+            hsv = cv2.merge((h, s, v))
+            bgr = self.HSV2BGR(hsv)
+        return bgr
+
+    def RandomSaturation(self, bgr):
+        if random.random() < 0.5:
+            hsv = self.BGR2HSV(bgr)
+            h, s, v = cv2.split(hsv)
+            adjust = random.choice([0.5, 1.5])
+            s = s * adjust
+            s = np.clip(s, 0, 255).astype(hsv.dtype)
+            hsv = cv2.merge((h, s, v))
+            bgr = self.HSV2BGR(hsv)
+        return bgr
+
+    def RandomHue(self, bgr):
+        if random.random() < 0.5:
+            hsv = self.BGR2HSV(bgr)
+            h, s, v = cv2.split(hsv)
+            adjust = random.choice([0.5, 1.5])
+            h = h * adjust
+            h = np.clip(h, 0, 255).astype(hsv.dtype)
+            hsv = cv2.merge((h, s, v))
+            bgr = self.HSV2BGR(hsv)
+        return bgr
+
+    def randomBlur(self, bgr):
+        if random.random() < 0.5:
+            bgr = cv2.blur(bgr, (5, 5))
+        return bgr
+
+    def random_flip(self, im, boxes):
+        if random.random() < 0.5:
+            im_lr = np.fliplr(im).copy()
+            # xc -> 1-xc
+            boxes[:, 0] = 1 - boxes[:, 0]
+            # yc -> 1-yc
+            boxes[:, 1] = 1 - boxes[:, 1]
+
+            return im_lr, boxes
+        return im, boxes
+
     def __getitem__(self, index) -> T_co:
         image_path = self.image_path_list[index]
         boxes = self.box_list[index]
         labels = self.label_list[index]
 
-        image = PIL.Image.open(image_path)
+        image = Image.open(image_path)
+        if self.train:
+            img = np.array(image)
+            img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+
+            img, boxes = self.random_flip(img, boxes)
+            img = self.randomBlur(img)
+            img = self.RandomBrightness(img)
+            img = self.RandomHue(img)
+            img = self.RandomSaturation(img)
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+            image = Image.fromarray(img)
+
         image = self.transform(image)
         # img = cv2.imread(image_path, cv2.IMREAD_COLOR)
         # img = cv2.resize(img, (self.target_size, self.target_size))
