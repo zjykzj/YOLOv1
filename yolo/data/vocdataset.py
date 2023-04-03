@@ -97,7 +97,7 @@ class VOCDataset(Dataset):
             class_onehot = torch.zeros(self.num_classes)
             class_onehot[labels[i]] = 1
             for bi in range(self.B):
-                if target[y_idx, x_idx, bi * 5 + 4] == 1:
+                if target[y_idx, x_idx, self.B * 4] == 1:
                     break
 
                 # 前B*4个是标注框
