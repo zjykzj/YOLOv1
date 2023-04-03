@@ -8,6 +8,7 @@
 """
 import shutil
 
+import numpy as np
 import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
@@ -87,13 +88,13 @@ def main():
     root = '/home/zj/yoyo'
     name = 'yolov1-voc-train'
     train_dataset = VOCDataset(root, name)
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True, num_workers=4)
 
     name = 'yolov1-voc-val'
     val_dataset = VOCDataset(root, name)
-    val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
+    val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False, num_workers=4)
 
-    best_loss = 0.
+    best_loss = np.Inf
 
     # train the model
     num_epochs = 50
@@ -106,7 +107,7 @@ def main():
 
         print("=> Val")
         loss = val(epoch, num_epochs, model, device, loss_fn, val_loader)
-        if loss > best_loss:
+        if loss < best_loss:
             best_loss = loss
             print(f"=> Best loss: {best_loss:.6f}")
             shutil.copy('checkpoint.pth.tar', 'best.pth.tar')
