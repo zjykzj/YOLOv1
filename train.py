@@ -88,11 +88,11 @@ def main():
     print("=> Load data")
     root = '/home/zj/yoyo'
     name = 'yolov1-voc-train'
-    train_dataset = VOCDataset(root, name)
+    train_dataset = VOCDataset(root, name, train=True)
     train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True, num_workers=4)
 
     name = 'yolov1-voc-val'
-    val_dataset = VOCDataset(root, name)
+    val_dataset = VOCDataset(root, name, train=False)
     val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False, num_workers=4)
 
     best_loss = np.Inf
