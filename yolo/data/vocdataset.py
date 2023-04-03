@@ -100,11 +100,14 @@ class VOCDataset(Dataset):
                 if target[y_idx, x_idx, bi * 5 + 4] == 1:
                     break
 
+                # 前B*4个是标注框
                 target[y_idx, x_idx, bi * 4:(bi + 1) * 4] = \
                     torch.from_numpy(np.array([x_offset, y_offset, box_w, box_h]))
+                # [B*4:B*5]是置信度
                 target[y_idx, x_idx, self.B * 4 + bi] = 1.
                 # target[y_idx, x_idx, bi * 5:(bi + 1) * 5] = \
                 #     torch.from_numpy(np.array([x_offset, y_offset, box_w, box_h, 1]))
+                # [B*5:]是分类概率
                 target[y_idx, x_idx, 5 * self.B:] = class_onehot
 
         return target

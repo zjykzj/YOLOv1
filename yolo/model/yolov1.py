@@ -170,6 +170,7 @@ class YOLOv1(nn.Module):
 if __name__ == '__main__':
     data = torch.randn(1, 3, 448, 448)
     model = YOLOv1(S=7)
+    model.eval()
     outputs = model(data)
     print(outputs.shape)
 
