@@ -10,6 +10,8 @@
 import torch
 import torch.nn as nn
 
+from classify import yolo
+
 
 def conv_bn_act(in_channels: int,
                 out_channels: int,
@@ -52,29 +54,31 @@ class FastYOLOv1(nn.Module):
         self.B = B  # 每个网格单元预测的边界框数量
         self.C = num_classes  # 对象类别数量
 
-        self.features = nn.Sequential(
-            conv_bn_act(3, 16, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-            nn.MaxPool2d(kernel_size=2, stride=2),
+        self.model = yolo.FastYOLOv1(num_classes=1000, S=3)
 
-            conv_bn_act(16, 32, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-
-            conv_bn_act(32, 64, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-
-            conv_bn_act(64, 128, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-
-            conv_bn_act(128, 256, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-
-            conv_bn_act(256, 512, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-
-            conv_bn_act(512, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-            conv_bn_act(1024, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-            conv_bn_act(1024, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-        )
+        # self.features = nn.Sequential(
+        #     conv_bn_act(3, 16, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+        #     nn.MaxPool2d(kernel_size=2, stride=2),
+        #
+        #     conv_bn_act(16, 32, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+        #     nn.MaxPool2d(kernel_size=2, stride=2),
+        #
+        #     conv_bn_act(32, 64, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+        #     nn.MaxPool2d(kernel_size=2, stride=2),
+        #
+        #     conv_bn_act(64, 128, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+        #     nn.MaxPool2d(kernel_size=2, stride=2),
+        #
+        #     conv_bn_act(128, 256, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+        #     nn.MaxPool2d(kernel_size=2, stride=2),
+        #
+        #     conv_bn_act(256, 512, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+        #     nn.MaxPool2d(kernel_size=2, stride=2),
+        #
+        #     conv_bn_act(512, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+        #     conv_bn_act(1024, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+        #     conv_bn_act(1024, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+        # )
 
         self.fc = nn.Sequential(
             nn.Flatten(),
@@ -85,7 +89,8 @@ class FastYOLOv1(nn.Module):
         )
 
     def forward(self, x):
-        x = self.features(x)
+        x = self.model.features(x)
+        # x = self.features(x)
         x = self.fc(x)
 
         return x.reshape(-1, self.S, self.S, self.B * 5 + self.C)
@@ -100,41 +105,42 @@ class YOLOv1(nn.Module):
         self.B = B  # 每个网格单元预测的边界框数量
         self.C = num_classes  # 对象类别数量
 
-        self.features = nn.Sequential(
-            conv_bn_act(3, 64, kernel_size=7, stride=2, padding=3, bias=False, is_bn=True, act='leaky_relu'),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-
-            conv_bn_act(64, 192, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-
-            conv_bn_act(192, 128, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
-            conv_bn_act(128, 256, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-            conv_bn_act(256, 256, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
-            conv_bn_act(256, 512, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-
-            conv_bn_act(512, 256, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
-            conv_bn_act(256, 512, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-            conv_bn_act(512, 256, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
-            conv_bn_act(256, 512, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-            conv_bn_act(512, 256, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
-            conv_bn_act(256, 512, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-            conv_bn_act(512, 256, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
-            conv_bn_act(256, 512, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-            conv_bn_act(512, 512, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
-            conv_bn_act(512, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-
-            conv_bn_act(1024, 512, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
-            conv_bn_act(512, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-            conv_bn_act(1024, 512, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
-            conv_bn_act(512, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-            conv_bn_act(1024, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-            conv_bn_act(1024, 1024, kernel_size=3, stride=2, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-
-            conv_bn_act(1024, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-            conv_bn_act(1024, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-        )
+        self.model = yolo.YOLOv1(num_classes=1000, S=4)
+        # self.features = nn.Sequential(
+        #     conv_bn_act(3, 64, kernel_size=7, stride=2, padding=3, bias=False, is_bn=True, act='leaky_relu'),
+        #     nn.MaxPool2d(kernel_size=2, stride=2),
+        #
+        #     conv_bn_act(64, 192, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+        #     nn.MaxPool2d(kernel_size=2, stride=2),
+        #
+        #     conv_bn_act(192, 128, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
+        #     conv_bn_act(128, 256, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+        #     conv_bn_act(256, 256, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
+        #     conv_bn_act(256, 512, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+        #     nn.MaxPool2d(kernel_size=2, stride=2),
+        #
+        #     conv_bn_act(512, 256, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
+        #     conv_bn_act(256, 512, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+        #     conv_bn_act(512, 256, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
+        #     conv_bn_act(256, 512, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+        #     conv_bn_act(512, 256, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
+        #     conv_bn_act(256, 512, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+        #     conv_bn_act(512, 256, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
+        #     conv_bn_act(256, 512, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+        #     conv_bn_act(512, 512, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
+        #     conv_bn_act(512, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+        #     nn.MaxPool2d(kernel_size=2, stride=2),
+        #
+        #     conv_bn_act(1024, 512, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
+        #     conv_bn_act(512, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+        #     conv_bn_act(1024, 512, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
+        #     conv_bn_act(512, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+        #     conv_bn_act(1024, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+        #     conv_bn_act(1024, 1024, kernel_size=3, stride=2, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+        #
+        #     conv_bn_act(1024, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+        #     conv_bn_act(1024, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+        # )
 
         self.fc = nn.Sequential(
             nn.Flatten(),
@@ -145,27 +151,28 @@ class YOLOv1(nn.Module):
         )
 
     def forward(self, x):
-        x = self.features(x)
+        x = self.model.features(x)
+        # x = self.features(x)
         x = self.fc(x)
 
         return x.reshape(-1, self.S, self.S, self.B * 5 + self.C)
 
 
 if __name__ == '__main__':
-    # data = torch.randn(1, 3, 448, 448)
-    # model = YOLOv1(S=7)
-    # outputs = model(data)
-    # print(outputs.shape)
-    #
-    # data = torch.randn(1, 3, 224, 224)
-    # model = YOLOv1(S=4)
-    # outputs = model(data)
-    # print(outputs.shape)
+    data = torch.randn(1, 3, 448, 448)
+    model = YOLOv1(S=7)
+    outputs = model(data)
+    print(outputs.shape)
 
-    # data = torch.randn(1, 3, 448, 448)
-    # model = FastYOLOv1(S=7)
-    # outputs = model(data)
-    # print(outputs.shape)
+    data = torch.randn(1, 3, 224, 224)
+    model = YOLOv1(S=4)
+    outputs = model(data)
+    print(outputs.shape)
+
+    data = torch.randn(1, 3, 448, 448)
+    model = FastYOLOv1(S=7)
+    outputs = model(data)
+    print(outputs.shape)
 
     data = torch.randn(1, 3, 224, 224)
     model = YOLOv1(S=4)
