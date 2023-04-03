@@ -104,10 +104,10 @@ def main():
         train(epoch, num_epochs, train_loader, optimizer, model, loss_fn, device)
         lr_scheduler.step()
 
-        torch.save(model.state_dict(), 'checkpoint.pth.tar')
-
         print("=> Val")
         loss = val(epoch, num_epochs, model, device, loss_fn, val_loader)
+
+        torch.save(model.state_dict(), 'checkpoint.pth.tar')
         if loss < best_loss:
             best_loss = loss
             print(f"=> Best loss: {best_loss:.6f}")
