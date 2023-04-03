@@ -106,6 +106,15 @@ class YOLOv1(nn.Module):
         self.C = num_classes  # 对象类别数量
 
         self.model = yolo.YOLOv1(num_classes=1000, S=4)
+
+        ckpt_path = "classify/model_best.pth.tar"
+        print(f"Load {ckpt_path}")
+        state_dict = torch.load(ckpt_path, map_location='cpu')
+        if 'state_dict' in state_dict:
+            state_dict = state_dict['state_dict']
+        state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}  # strip the names
+        self.model.load_state_dict(state_dict, strict=True)
+
         # self.features = nn.Sequential(
         #     conv_bn_act(3, 64, kernel_size=7, stride=2, padding=3, bias=False, is_bn=True, act='leaky_relu'),
         #     nn.MaxPool2d(kernel_size=2, stride=2),
