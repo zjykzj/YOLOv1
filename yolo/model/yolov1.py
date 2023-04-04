@@ -34,8 +34,12 @@ def conv_bn_act(in_channels: int,
     # 定义激活层
     if 'relu' == act:
         activation = nn.ReLU(inplace=True)
-    else:
+    elif 'leaky_relu' == act:
         activation = nn.LeakyReLU(negative_slope=0.1, inplace=True)
+    elif 'identity' == act:
+        activation = nn.Identity()
+    else:
+        raise ValueError(f"{act} doesn't supports")
 
     # 返回一个 nn.Sequential 对象，按顺序组合卷积层、归一化层和激活层
     return nn.Sequential(
@@ -80,20 +84,18 @@ class FastYOLOv1(nn.Module):
         #     conv_bn_act(1024, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
         # )
 
-        self.fc = nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(1024 * self.S * self.S, 4096),
-            nn.LeakyReLU(0.1, inplace=True),
-            nn.Dropout(p=0.5),
-            nn.Linear(4096, self.S * self.S * (self.B * 5 + self.C))
-        )
+        self.fc = conv_bn_act(1024, self.B * 5 + self.C, kernel_size=3, stride=1, padding=1,
+                              bias=True, is_bn=True, act='identity')
 
     def forward(self, x):
         x = self.model.features(x)
         # x = self.features(x)
         x = self.fc(x)
+        # 归一化到0-1
+        x = torch.sigmoid(x)
+        x = x.permute(0, 2, 3, 1)
 
-        return x.reshape(-1, self.S, self.S, self.B * 5 + self.C)
+        return x
 
 
 class YOLOv1(nn.Module):
@@ -107,13 +109,13 @@ class YOLOv1(nn.Module):
 
         self.model = yolo.YOLOv1(num_classes=1000, S=4)
 
-        ckpt_path = "classify/model_best.pth.tar"
-        print(f"Load {ckpt_path}")
-        state_dict = torch.load(ckpt_path, map_location='cpu')
-        if 'state_dict' in state_dict:
-            state_dict = state_dict['state_dict']
-        state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}  # strip the names
-        self.model.load_state_dict(state_dict, strict=True)
+        # ckpt_path = "classify/model_best.pth.tar"
+        # print(f"Load {ckpt_path}")
+        # state_dict = torch.load(ckpt_path, map_location='cpu')
+        # if 'state_dict' in state_dict:
+        #     state_dict = state_dict['state_dict']
+        # state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}  # strip the names
+        # self.model.load_state_dict(state_dict, strict=True)
 
         # self.features = nn.Sequential(
         #     conv_bn_act(3, 64, kernel_size=7, stride=2, padding=3, bias=False, is_bn=True, act='leaky_relu'),
@@ -151,20 +153,18 @@ class YOLOv1(nn.Module):
         #     conv_bn_act(1024, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
         # )
 
-        self.fc = nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(1024 * self.S * self.S, 4096),
-            nn.LeakyReLU(0.1, inplace=True),
-            nn.Dropout(p=0.5),
-            nn.Linear(4096, self.S * self.S * (self.B * 5 + self.C))
-        )
+        self.fc = conv_bn_act(1024, self.B * 5 + self.C, kernel_size=3, stride=1, padding=1,
+                              bias=True, is_bn=True, act='identity')
 
     def forward(self, x):
         x = self.model.features(x)
         # x = self.features(x)
         x = self.fc(x)
+        # 归一化到0-1
+        x = torch.sigmoid(x)
+        x = x.permute(0, 2, 3, 1)
 
-        return x.reshape(-1, self.S, self.S, self.B * 5 + self.C)
+        return x
 
 
 if __name__ == '__main__':
