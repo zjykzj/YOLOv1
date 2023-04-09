@@ -62,10 +62,13 @@ class YOLOv1Loss(nn.Module):
         # extract predicted objectness scores, predicted bounding boxes, and predicted class probabilities
         # [N, S, S, B]
         pred_conf = predictions[..., self.B * 4:self.B * 5]
+        assert torch.tensor(pred_conf.shape).tolist() == [N, self.S, self.S, self.B]
         # [N, S, S, B*4] -> [N, S, S, B, 4]
         pred_boxes = predictions[..., :self.B * 4].reshape(N, self.S, self.S, self.B, 4)
+        assert torch.tensor(pred_boxes.shape).tolist() == [N, self.S, self.S, self.B, 4]
         # [N, S, S, C]
         pred_class = predictions[..., self.B * 5:]
+        assert torch.tensor(pred_class.shape).tolist() == [N, self.S, self.S, self.C]
         # extract target objectness scores, target bounding boxes, and target class probabilities
         target_conf = targets[..., self.B * 4:self.B * 5]
         target_boxes = targets[..., :self.B * 4].reshape(N, self.S, self.S, self.B, 4)
@@ -77,15 +80,11 @@ class YOLOv1Loss(nn.Module):
         obj_mask[obj_mask > 0] = 1
         obj_mask[obj_mask <= 0] = 0
 
-        # Compute the binary mask for the absence of objects in each grid cell.
-        # [N, S, S, B]
-        noobj_mask = 1 - obj_mask
-
         # 计算损失如下：
         # 1. 包含标注框的网格中响应框的坐标损失
         # 2. 包含标注框的网格中响应框的置信度损失
         # 3. 包含标注框的网格中不响应框的置信度损失
-        # 4. 不包含标注框的网格对应预测框的置信度损失
+        # 4. 不包含标注框的网格预测框的置信度损失
         # 5. 包含标注框的网格分类损失
         loss_for_coord = 0.
         loss_for_response = 0.
@@ -109,7 +108,9 @@ class YOLOv1Loss(nn.Module):
                         pred_yc = (pred_grid_boxes[:, 1] + j) * cell_size
                         pred_w = pred_grid_boxes[:, 2]
                         pred_h = pred_grid_boxes[:, 3]
+                        # 得到的预测结果是相对于图像宽高的比例
 
+                        # [xc, yc, w, h] -> [x1, y1, x2, y2]
                         pred_x1 = pred_xc - 0.5 * pred_w
                         pred_y1 = pred_yc - 0.5 * pred_h
                         pred_x2 = pred_xc + 0.5 * pred_w
@@ -117,8 +118,8 @@ class YOLOv1Loss(nn.Module):
 
                         # [1, 4]
                         target_grid_boxes = target_boxes[ni, i, j, 0].unsqueeze(0)
-                        target_xc = (target_grid_boxes[:, 0] + i) * cell_size
-                        target_yc = (target_grid_boxes[:, 1] + j) * cell_size
+                        target_xc = (target_grid_boxes[:, 0] * cell_size + i + 1) * cell_size
+                        target_yc = (target_grid_boxes[:, 1] * cell_size + j + 1) * cell_size
                         target_w = target_grid_boxes[:, 2]
                         target_h = target_grid_boxes[:, 3]
 
@@ -134,24 +135,25 @@ class YOLOv1Loss(nn.Module):
                         )
                         max_iou_id = torch.argmax(ious).detach().cpu().item()
 
+                        # 计算网格分类损失
+                        loss_for_cls += F.mse_loss(pred_class[ni, i, j], target_class[ni, i, j], reduction='sum')
                         for bi in range(self.B):
                             if bi == max_iou_id:
                                 # 计算响应框置信度损失
                                 loss_for_response += (pred_conf[ni, i, j, max_iou_id] - 1.) ** 2
 
                                 # 计算坐标损失
+                                # [4]
                                 loss_for_coord += F.mse_loss(pred_boxes[ni, i, j, max_iou_id],
                                                              target_boxes[ni, i, j, max_iou_id], reduction='sum')
                             else:
                                 # 计算不响应框置信度损失
                                 loss_for_noresponse += (pred_conf[ni, i, j, bi] - 0.) ** 2
-
-                        # 计算网格分类损失
-                        loss_for_cls += F.mse_loss(pred_class[ni, i, j], target_class[ni, i, j], reduction='sum')
                     else:
                         # 不包含标注框，仅计算置信度损失
+                        # [B]
                         loss_for_noobj += F.mse_loss(pred_conf[ni, i, j],
-                                                     torch.zeros(target_conf[ni, i, j].shape).to(device),
+                                                     target_conf[ni, i, j],
                                                      reduction='sum')
 
         loss = self.lambda_coord * loss_for_coord + \
@@ -163,14 +165,15 @@ class YOLOv1Loss(nn.Module):
 
 
 if __name__ == '__main__':
-    m = YOLOv1Loss()
-    print(m)
-
     torch.manual_seed(32)
 
     B = 2
     S = 7
     N_cls = 20
+
+    m = YOLOv1Loss(S=S, B=B, C=N_cls)
+    print(m)
+
     a = torch.randn(1, S, S, 5 * B + N_cls)
     b = torch.zeros(1, S, S, 5 * B + N_cls)
     b[:, 2, 3] = torch.abs(torch.randn(5 * B + N_cls))
