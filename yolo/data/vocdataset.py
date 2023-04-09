@@ -160,16 +160,17 @@ class VOCDataset(Dataset):
         for i in range(len(boxes)):
             xc, yc, box_w, box_h = boxes[i][:4]
             x_idx, y_idx = int(xc // cell_size), int(yc // cell_size)
-            x_offset = xc / cell_size - x_idx
-            y_offset = yc / cell_size - y_idx
+            if target[y_idx, x_idx, self.B * 4] == 1:
+                break
 
             class_onehot = torch.zeros(self.num_classes)
             class_onehot[labels[i]] = 1
+            # [B*5:]是分类概率
+            target[y_idx, x_idx, 5 * self.B:] = class_onehot
 
+            x_offset = xc / cell_size - x_idx
+            y_offset = yc / cell_size - y_idx
             for bi in range(self.B):
-                if target[y_idx, x_idx, self.B * 4] == 1:
-                    break
-
                 # 前B*4个是标注框
                 target[y_idx, x_idx, bi * 4:(bi + 1) * 4] = \
                     torch.from_numpy(np.array([x_offset, y_offset, box_w, box_h]))
@@ -177,8 +178,6 @@ class VOCDataset(Dataset):
                 target[y_idx, x_idx, self.B * 4 + bi] = 1.
                 # target[y_idx, x_idx, bi * 5:(bi + 1) * 5] = \
                 #     torch.from_numpy(np.array([x_offset, y_offset, box_w, box_h, 1]))
-                # [B*5:]是分类概率
-                target[y_idx, x_idx, 5 * self.B:] = class_onehot
 
         return target
 
