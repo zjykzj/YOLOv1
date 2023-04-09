@@ -97,7 +97,7 @@ def main():
     print(loss_fn)
 
     # define the optimizer
-    optimizer = optim.SGD(model.parameters(), lr=1e-3, momentum=0.9, weight_decay=1e-4)
+    optimizer = optim.SGD(model.parameters(), lr=1e-3, momentum=0.9, weight_decay=5e-4)
     lr_scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[20, 35, 45], gamma=0.1)
     print(optimizer)
     print(lr_scheduler)
