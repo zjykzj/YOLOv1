@@ -16,6 +16,7 @@ from torch.utils.data import DataLoader
 from yolo.model.yolov1 import YOLOv1
 from yolo.model.yololoss import YOLOv1Loss
 from yolo.data.vocdataset import VOCDataset
+from yolo.data.transform import Transform
 
 
 def train(epoch, num_epochs, train_loader, optimizer, model, loss_fn, device):
@@ -106,11 +107,11 @@ def main():
     print("=> Load data")
     root = '/home/zj/yoyo/voc'
     name = 'voc2yolov5-train'
-    train_dataset = VOCDataset(root, name, train=True, B=B, S=S, target_size=448)
+    train_dataset = VOCDataset(root, name, train=True, B=B, S=S, target_size=448, transform=Transform(is_train=True))
     train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True, num_workers=4)
 
     name = 'voc2yolov5-val'
-    val_dataset = VOCDataset(root, name, train=False, B=B, S=S, target_size=448)
+    val_dataset = VOCDataset(root, name, train=False, B=B, S=S, target_size=448, transform=Transform(is_train=False))
     val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False, num_workers=4)
 
     best_epoch = 0
