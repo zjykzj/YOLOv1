@@ -113,7 +113,10 @@ class VOCDataset(Dataset):
         boxes = boxes / self.target_size
         boxes = coco2yolobox(boxes)
         target = self.build_target(boxes, labels)
-        return image, target
+        if self.train:
+            return image, target
+        else:
+            return image, target, np.array(img_info)
 
     def build_target(self, boxes, labels):
         """
