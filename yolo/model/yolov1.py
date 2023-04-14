@@ -60,6 +60,14 @@ class FastYOLOv1(nn.Module):
 
         self.model = yolo.FastYOLOv1(num_classes=1000, S=3)
 
+        ckpt_path = "classify/weights/fastyolov1/model_best.pth.tar"
+        print(f"Load {ckpt_path}")
+        state_dict = torch.load(ckpt_path, map_location='cpu')
+        if 'state_dict' in state_dict:
+            state_dict = state_dict['state_dict']
+        state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}  # strip the names
+        self.model.load_state_dict(state_dict, strict=True)
+
         # self.features = nn.Sequential(
         #     conv_bn_act(3, 16, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
         #     nn.MaxPool2d(kernel_size=2, stride=2),
@@ -84,8 +92,15 @@ class FastYOLOv1(nn.Module):
         #     conv_bn_act(1024, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
         # )
 
-        self.fc = conv_bn_act(1024, self.B * 5 + self.C, kernel_size=3, stride=1, padding=1,
-                              bias=True, is_bn=True, act='identity')
+        # self.fc = conv_bn_act(1024, self.B * 5 + self.C, kernel_size=3, stride=1, padding=1,
+        #                       bias=True, is_bn=True, act='identity')
+        self.fc = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(1024 * self.S * self.S, 4096),
+            nn.LeakyReLU(0.1, inplace=True),
+            nn.Dropout(p=0.5),
+            nn.Linear(4096, self.S * self.S * (5 * self.B + self.C)),
+        )
 
     def forward(self, x):
         x = self.model.features(x)
@@ -93,9 +108,8 @@ class FastYOLOv1(nn.Module):
         x = self.fc(x)
         # 归一化到0-1
         x = torch.sigmoid(x)
-        # [N, C, H, W] -> [N, H, W, C]
-        x = x.permute(0, 2, 3, 1)
 
+        x = x.reshape(-1, self.S, self.S, 5 * self.B + self.C)
         return x
 
 
@@ -154,8 +168,15 @@ class YOLOv1(nn.Module):
         #     conv_bn_act(1024, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
         # )
 
-        self.fc = conv_bn_act(1024, self.B * 5 + self.C, kernel_size=3, stride=1, padding=1,
-                              bias=True, is_bn=True, act='identity')
+        # self.fc = conv_bn_act(1024, self.B * 5 + self.C, kernel_size=3, stride=1, padding=1,
+        #                       bias=True, is_bn=True, act='identity')
+        self.fc = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(1024 * self.S * self.S, 4096),
+            nn.LeakyReLU(0.1, inplace=True),
+            nn.Dropout(p=0.5),
+            nn.Linear(4096, self.S * self.S * (5 * self.B + self.C)),
+        )
 
     def forward(self, x):
         x = self.model.features(x)
@@ -163,9 +184,8 @@ class YOLOv1(nn.Module):
         x = self.fc(x)
         # 归一化到0-1
         x = torch.sigmoid(x)
-        # [N, C, H, W] -> [N, H, W, C]
-        x = x.permute(0, 2, 3, 1)
 
+        x = x.reshape(-1, self.S, self.S, 5 * self.B + self.C)
         return x
 
 
