@@ -51,24 +51,31 @@ class FastYOLOv1(nn.Module):
         self.S = S
 
         self.features = nn.Sequential(
+            # [1]
             conv_bn_act(3, 16, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
             nn.MaxPool2d(kernel_size=2, stride=2),
 
+            # [2]
             conv_bn_act(16, 32, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
             nn.MaxPool2d(kernel_size=2, stride=2),
 
+            # [3]
             conv_bn_act(32, 64, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
             nn.MaxPool2d(kernel_size=2, stride=2),
 
+            # [4]
             conv_bn_act(64, 128, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
             nn.MaxPool2d(kernel_size=2, stride=2),
 
+            # [5]
             conv_bn_act(128, 256, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
             nn.MaxPool2d(kernel_size=2, stride=2),
 
+            # [6]
             conv_bn_act(256, 512, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
             nn.MaxPool2d(kernel_size=2, stride=2),
 
+            # [7] -> [9]
             conv_bn_act(512, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
             conv_bn_act(1024, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
             conv_bn_act(1024, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
@@ -97,18 +104,22 @@ class YOLOv1(nn.Module):
         self.S = S  # 特征图大小
 
         self.features = nn.Sequential(
+            # [1]
             conv_bn_act(3, 64, kernel_size=7, stride=2, padding=3, bias=False, is_bn=True, act='leaky_relu'),
             nn.MaxPool2d(kernel_size=2, stride=2),
 
+            # [2]
             conv_bn_act(64, 192, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
             nn.MaxPool2d(kernel_size=2, stride=2),
 
+            # [3] -> [6]
             conv_bn_act(192, 128, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
             conv_bn_act(128, 256, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
             conv_bn_act(256, 256, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
             conv_bn_act(256, 512, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
             nn.MaxPool2d(kernel_size=2, stride=2),
 
+            # [7] -> [16]
             conv_bn_act(512, 256, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
             conv_bn_act(256, 512, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
             conv_bn_act(512, 256, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
@@ -121,6 +132,7 @@ class YOLOv1(nn.Module):
             conv_bn_act(512, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
             nn.MaxPool2d(kernel_size=2, stride=2),
 
+            # [17] -> [22]
             conv_bn_act(1024, 512, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
             conv_bn_act(512, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
             conv_bn_act(1024, 512, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
@@ -128,6 +140,7 @@ class YOLOv1(nn.Module):
             conv_bn_act(1024, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
             conv_bn_act(1024, 1024, kernel_size=3, stride=2, padding=1, bias=False, is_bn=True, act='leaky_relu'),
 
+            # [23] -> [24]
             conv_bn_act(1024, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
             conv_bn_act(1024, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
         )
