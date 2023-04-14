@@ -19,11 +19,25 @@ from yolo.data.vocdataset import VOCDataset
 from yolo.data.transform import Transform
 
 
-def train(epoch, num_epochs, train_loader, optimizer, model, loss_fn, device):
+def adjust_learning_rate(base_lr, warmup_epoch,
+                         optimizer: optim.Optimizer, epoch: int, step: int, len_epoch: int) -> None:
+    """LR schedule that should yield 76% converged accuracy with batch size 256"""
+    # Warmup
+    lr = base_lr * float(1 + step + epoch * len_epoch) / (warmup_epoch * len_epoch)
+
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
+
+
+def train(base_lr, warmup_epoch,
+          epoch, num_epochs, train_loader, optimizer, model, loss_fn, device):
     model.train()
 
     total_loss = 0.
     for i, (inputs, targets) in enumerate(train_loader):
+        if (epoch + 1) <= warmup_epoch:
+            adjust_learning_rate(base_lr, warmup_epoch, optimizer, epoch, i, len(train_loader))
+
         # zero the gradients
         optimizer.zero_grad()
 
@@ -53,7 +67,7 @@ def val(epoch, num_epochs, model, device, loss_fn, val_loader):
     model.eval()
 
     total_loss = 0.
-    for i, (inputs, targets) in enumerate(val_loader):
+    for i, (inputs, targets, _) in enumerate(val_loader):
         # forward pass
         outputs = model(inputs.to(device))
         loss = loss_fn(outputs, targets.to(device))
@@ -79,7 +93,6 @@ def main():
     C = 20
 
     # define the YOLOv1 model
-    # model = YOLOv1().to(device)
     model = YOLOv1(num_classes=C, S=S, B=B).to(device)
     print(model)
 
@@ -87,10 +100,6 @@ def main():
     lambda_obj = 1.
     lambda_noobj = 0.5
     lambda_class = 1.
-    # lambda_coord = 1.
-    # lambda_obj = 1.
-    # lambda_noobj = 1.
-    # lambda_class = 1.
 
     # define the loss function
     loss_fn = YOLOv1Loss(S=S, B=B, C=C, lambda_coord=lambda_coord, lambda_obj=lambda_obj, lambda_noobj=lambda_noobj,
@@ -98,8 +107,10 @@ def main():
     print(loss_fn)
 
     # define the optimizer
-    optimizer = optim.SGD(model.parameters(), lr=1e-3, momentum=0.9, weight_decay=5e-4)
-    lr_scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[20, 35, 45], gamma=0.1)
+    base_lr = 1e-2
+    optimizer = optim.SGD(model.parameters(), lr=base_lr, momentum=0.9, weight_decay=5e-4)
+    num_epochs = 135
+    lr_scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[70, 100], gamma=0.1)
     print(optimizer)
     print(lr_scheduler)
 
@@ -108,22 +119,24 @@ def main():
     root = '/home/zj/yoyo/voc'
     name = 'voc2yolov5-train'
     train_dataset = VOCDataset(root, name, train=True, B=B, S=S, target_size=448, transform=Transform(is_train=True))
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True, num_workers=4)
+    train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True, num_workers=4)
 
     name = 'voc2yolov5-val'
     val_dataset = VOCDataset(root, name, train=False, B=B, S=S, target_size=448, transform=Transform(is_train=False))
-    val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False, num_workers=4)
+    val_loader = DataLoader(val_dataset, batch_size=64, shuffle=False, num_workers=4)
 
     best_epoch = 0
     best_loss = np.Inf
 
+    warmup_epoch = 5
     # train the model
-    num_epochs = 50
     for epoch in range(num_epochs):
         print("=> Train")
-        loss = train(epoch, num_epochs, train_loader, optimizer, model, loss_fn, device)
+        loss = train(base_lr, warmup_epoch,
+                     epoch, num_epochs, train_loader, optimizer, model, loss_fn, device)
         print(f"=> Train Loss: {loss:.6f}")
-        lr_scheduler.step()
+        if (epoch + 1) > warmup_epoch:
+            lr_scheduler.step()
 
         print("=> Val")
         loss = val(epoch, num_epochs, model, device, loss_fn, val_loader)
