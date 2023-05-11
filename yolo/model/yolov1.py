@@ -92,9 +92,9 @@ class YOLOLayer(nn.Module):
         # x/y/w/h/conf/probs compress to [0,1]
         outputs = torch.sigmoid(outputs)
 
-        pred_boxes = outputs[..., 4 * self.B].reshape(N, H, W, self.B, 4)
-        pred_confs = outputs[..., 4 * self.B:5 * self.B]
-        pred_probs = outputs[..., 5 * self.B:]
+        pred_boxes = outputs[..., :(self.B * 4)].reshape(N, H, W, self.B, 4)
+        pred_confs = outputs[..., (self.B * 4):(self.B * 5)]
+        pred_probs = outputs[..., (self.B * 5):]
 
         preds = torch.zeros(N, H, W, self.B, 5 + self.C)
         preds[..., :4] = pred_boxes
