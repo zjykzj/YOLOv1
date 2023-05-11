@@ -7,10 +7,16 @@
 @description: 
 """
 
+import os
+
 import torch
 import torch.nn as nn
 
 from classify import yolo
+
+from yolo.util import logging
+
+logger = logging.get_logger(__name__)
 
 
 def conv_bn_act(in_channels: int,
@@ -49,72 +55,8 @@ def conv_bn_act(in_channels: int,
     )
 
 
-class FastYOLOv1(nn.Module):
-    def __init__(self, num_classes=20, S=7, B=2):
-        super(FastYOLOv1, self).__init__()
-
-        self.num_classes = num_classes
-        self.S = S  # 特征图大小
-        self.B = B  # 每个网格单元预测的边界框数量
-        self.C = num_classes  # 对象类别数量
-
-        self.model = yolo.FastYOLOv1(num_classes=1000, S=3)
-
-        ckpt_path = "classify/weights/fastyolov1/model_best.pth.tar"
-        print(f"Load {ckpt_path}")
-        state_dict = torch.load(ckpt_path, map_location='cpu')
-        if 'state_dict' in state_dict:
-            state_dict = state_dict['state_dict']
-        state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}  # strip the names
-        self.model.load_state_dict(state_dict, strict=True)
-
-        # self.features = nn.Sequential(
-        #     conv_bn_act(3, 16, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-        #     nn.MaxPool2d(kernel_size=2, stride=2),
-        #
-        #     conv_bn_act(16, 32, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-        #     nn.MaxPool2d(kernel_size=2, stride=2),
-        #
-        #     conv_bn_act(32, 64, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-        #     nn.MaxPool2d(kernel_size=2, stride=2),
-        #
-        #     conv_bn_act(64, 128, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-        #     nn.MaxPool2d(kernel_size=2, stride=2),
-        #
-        #     conv_bn_act(128, 256, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-        #     nn.MaxPool2d(kernel_size=2, stride=2),
-        #
-        #     conv_bn_act(256, 512, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-        #     nn.MaxPool2d(kernel_size=2, stride=2),
-        #
-        #     conv_bn_act(512, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-        #     conv_bn_act(1024, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-        #     conv_bn_act(1024, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-        # )
-
-        # self.fc = conv_bn_act(1024, self.B * 5 + self.C, kernel_size=3, stride=1, padding=1,
-        #                       bias=True, is_bn=True, act='identity')
-        self.fc = nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(1024 * self.S * self.S, 4096),
-            nn.LeakyReLU(0.1, inplace=True),
-            nn.Dropout(p=0.5),
-            nn.Linear(4096, self.S * self.S * (5 * self.B + self.C)),
-        )
-
-    def forward(self, x):
-        x = self.model.features(x)
-        # x = self.features(x)
-        x = self.fc(x)
-        # 归一化到0-1
-        x = torch.sigmoid(x)
-
-        x = x.reshape(-1, self.S, self.S, 5 * self.B + self.C)
-        return x
-
-
 class YOLOv1(nn.Module):
-    def __init__(self, num_classes=20, S=7, B=2):
+    def __init__(self, num_classes=20, S=7, B=2, arch='yolov1', pretrained=None):
         super(YOLOv1, self).__init__()
 
         self.num_classes = num_classes
@@ -122,51 +64,12 @@ class YOLOv1(nn.Module):
         self.B = B  # 每个网格单元预测的边界框数量
         self.C = num_classes  # 对象类别数量
 
-        self.model = yolo.YOLOv1(num_classes=1000, S=4)
-
-        ckpt_path = "classify/weights/yolov1/model_best.pth.tar"
-        print(f"Load {ckpt_path}")
-        state_dict = torch.load(ckpt_path, map_location='cpu')
-        if 'state_dict' in state_dict:
-            state_dict = state_dict['state_dict']
-        state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}  # strip the names
-        self.model.load_state_dict(state_dict, strict=True)
-
-        # self.features = nn.Sequential(
-        #     conv_bn_act(3, 64, kernel_size=7, stride=2, padding=3, bias=False, is_bn=True, act='leaky_relu'),
-        #     nn.MaxPool2d(kernel_size=2, stride=2),
-        #
-        #     conv_bn_act(64, 192, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-        #     nn.MaxPool2d(kernel_size=2, stride=2),
-        #
-        #     conv_bn_act(192, 128, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
-        #     conv_bn_act(128, 256, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-        #     conv_bn_act(256, 256, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
-        #     conv_bn_act(256, 512, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-        #     nn.MaxPool2d(kernel_size=2, stride=2),
-        #
-        #     conv_bn_act(512, 256, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
-        #     conv_bn_act(256, 512, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-        #     conv_bn_act(512, 256, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
-        #     conv_bn_act(256, 512, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-        #     conv_bn_act(512, 256, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
-        #     conv_bn_act(256, 512, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-        #     conv_bn_act(512, 256, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
-        #     conv_bn_act(256, 512, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-        #     conv_bn_act(512, 512, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
-        #     conv_bn_act(512, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-        #     nn.MaxPool2d(kernel_size=2, stride=2),
-        #
-        #     conv_bn_act(1024, 512, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
-        #     conv_bn_act(512, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-        #     conv_bn_act(1024, 512, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
-        #     conv_bn_act(512, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-        #     conv_bn_act(1024, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-        #     conv_bn_act(1024, 1024, kernel_size=3, stride=2, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-        #
-        #     conv_bn_act(1024, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-        #     conv_bn_act(1024, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-        # )
+        if 'yolov1' == arch.lower():
+            self.model = yolo.YOLOv1(num_classes=1000, S=4)
+        elif 'fastyolov1' == arch.lower():
+            self.model = yolo.FastYOLOv1(num_classes=1000, S=3)
+        else:
+            raise ValueError(f"{arch} doesn't supports")
 
         # self.fc = conv_bn_act(1024, self.B * 5 + self.C, kernel_size=3, stride=1, padding=1,
         #                       bias=True, is_bn=True, act='identity')
@@ -178,6 +81,32 @@ class YOLOv1(nn.Module):
             nn.Linear(4096, self.S * self.S * (5 * self.B + self.C)),
         )
 
+        self.__init_weights(pretrained)
+
+    def __init_weights(self, pretrained=None):
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
+                # nn.init.normal_(m.weight, 0, 0.01)
+                # nn.init.constant_(m.weight, 0.01)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.normal_(m.weight, 0, 0.01)
+                # nn.init.constant_(m.weight, 0.01)
+                nn.init.constant_(m.bias, 0)
+
+        if pretrained is not None and pretrained != '':
+            assert os.path.isfile(pretrained), pretrained
+            logger.info(f'Loading pretrained {self.arch}: {pretrained}')
+
+            state_dict = torch.load(pretrained, map_location='cpu')
+            if 'state_dict' in state_dict:
+                state_dict = state_dict['state_dict']
+            state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}  # strip the names
+
+            self.darknet.load_state_dict(state_dict, strict=True)
+
     def forward(self, x):
         x = self.model.features(x)
         # x = self.features(x)
@@ -187,26 +116,3 @@ class YOLOv1(nn.Module):
 
         x = x.reshape(-1, self.S, self.S, 5 * self.B + self.C)
         return x
-
-
-if __name__ == '__main__':
-    data = torch.randn(1, 3, 448, 448)
-    model = YOLOv1(S=7)
-    model.eval()
-    outputs = model(data)
-    print(outputs.shape)
-
-    data = torch.randn(1, 3, 224, 224)
-    model = YOLOv1(S=4)
-    outputs = model(data)
-    print(outputs.shape)
-
-    data = torch.randn(1, 3, 448, 448)
-    model = FastYOLOv1(S=7)
-    outputs = model(data)
-    print(outputs.shape)
-
-    data = torch.randn(1, 3, 224, 224)
-    model = YOLOv1(S=4)
-    outputs = model(data)
-    print(outputs.shape)
