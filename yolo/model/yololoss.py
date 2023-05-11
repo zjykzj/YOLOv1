@@ -1,46 +1,67 @@
 # -*- coding: utf-8 -*-
 
 """
-@date: 2023/3/30 下午4:59
-@file: loss_zj.py
+@date: 2023/5/11 下午5:49
+@file: yololoss.py
 @author: zj
 @description: 
 """
 
 import torch
-from torch import nn
+from torch import Tensor
+import torch.nn as nn
 import torch.nn.functional as F
 
+from yolo.util.box_utils import bboxes_iou
 
-def bbox_iou(boxes1, boxes2):
-    assert len(boxes1.shape) == 2, boxes1
-    assert len(boxes2.shape) == 2, boxes2
-    # boxes1 shape: (N, 4)
-    # boxes2 shape: (M, 4)
-    N = boxes1.size(0)
-    M = boxes2.size(0)
 
-    # [x_min, y_min]
-    lt = torch.max(boxes1[:, :2].unsqueeze(1).expand(N, M, 2),
-                   boxes2[:, :2].unsqueeze(0).expand(N, M, 2))
-    # [x_max, y_max]
-    rb = torch.min(boxes1[:, 2:].unsqueeze(1).expand(N, M, 2),
-                   boxes2[:, 2:].unsqueeze(0).expand(N, M, 2))
+def make_deltas(box1: Tensor, box2: Tensor) -> Tensor:
+    """
+    t_x = b_x - c_x
+    t_y = b_y - c_y
+    t_w = b_w
+    t_h = b_h
 
-    wh = (rb - lt).clamp(min=0)
-    inter = wh[:, :, 0] * wh[:, :, 1]
+    Arguments:
+    box1 -- tensor of shape (N, 4) first set of boxes (c_x, c_y, w, h)
+    box2 -- tensor of shape (N, 4) second set of boxes (c_x, c_y, w, h)
 
-    # (x_max - x_min) * (y_max - y_min)
-    area1 = (boxes1[:, 2] - boxes1[:, 0]) * (boxes1[:, 3] - boxes1[:, 1])
-    area2 = (boxes2[:, 2] - boxes2[:, 0]) * (boxes2[:, 3] - boxes2[:, 1])
+    Returns:
+    deltas -- tensor of shape (N, 4) delta values (t_x, t_y, t_w, t_h)
+                   used for transforming boxes to reference boxes
+    """
+    assert len(box1.shape) == len(box2.shape) == 2
+    # [N, 4] -> [N]
+    t_x = box2[:, 0] - box1[:, 0]
+    t_y = box2[:, 1] - box1[:, 1]
+    t_w = box2[:, 2]
+    t_h = box2[:, 3]
 
-    # [N, M]
-    iou = inter / (area1.unsqueeze(1) + area2.unsqueeze(0) - inter)
+    t_x = t_x.view(-1, 1)
+    t_y = t_y.view(-1, 1)
+    t_w = t_w.view(-1, 1)
+    t_h = t_h.view(-1, 1)
 
-    return iou
+    # σ(t_x), σ(t_y), exp(t_w), exp(t_h)
+    deltas = torch.cat([t_x, t_y, t_w, t_h], dim=1)
+    return deltas
+
+
+def build_mask(N, H, W, B=2, C=20, dtype=torch.float, device=torch.device('cpu')):
+    iou_target = torch.zeros((N, H * W, B)).to(dtype=dtype, device=device)
+    iou_mask = torch.ones(N, H * W, B).to(dtype=dtype, device=device)
+
+    box_target = torch.zeros((N, H * W, B, 4)).to(dtype=dtype, device=device)
+    box_mask = torch.zeros((N, H * W, B, 1)).to(dtype=dtype, device=device)
+
+    class_target = torch.zeros((N, H * W, C)).to(dtype=dtype, device=device)
+    class_mask = torch.zeros((N, H * W, 1)).to(dtype=dtype, device=device)
+
+    return iou_target, iou_mask, box_target, box_mask, class_target, class_mask
 
 
 class YOLOv1Loss(nn.Module):
+
     def __init__(self, S=7, B=2, C=20, lambda_coord=5.0, lambda_obj=1.0, lambda_noobj=0.5, lambda_class=1.0):
         super(YOLOv1Loss, self).__init__()
         self.S = S
@@ -51,166 +72,115 @@ class YOLOv1Loss(nn.Module):
         self.lambda_noobj = lambda_noobj
         self.lambda_class = lambda_class
 
-    def forward(self, predictions, targets):
-        # predictions shape: (batch_size, S, S, (B*5+C))
-        # targets shape: (batch_size, S, S, (B*5+C))
-        assert predictions.shape == targets.shape
+    def build_target(self, outputs, targets):
+        N, H, W, n_ch = outputs.shape
+        assert n_ch == (self.B * 5 + self.C)
+        assert H == W == self.S
 
-        N = len(predictions)
-        assert self.S == predictions.shape[2] and self.S == predictions.shape[2]
-        assert (self.B * 5 + self.C) == predictions.shape[-1]
+        dtype = outputs.dtype
+        device = outputs.device
 
-        # extract predicted objectness scores, predicted bounding boxes, and predicted class probabilities
-        # [N, S, S, B]
-        pred_conf = predictions[..., self.B * 4:self.B * 5]
-        assert torch.tensor(pred_conf.shape).tolist() == [N, self.S, self.S, self.B]
-        # [N, S, S, B*4] -> [N, S, S, B, 4]
-        pred_boxes = predictions[..., :self.B * 4].reshape(N, self.S, self.S, self.B, 4)
-        assert torch.tensor(pred_boxes.shape).tolist() == [N, self.S, self.S, self.B, 4]
-        # [N, S, S, C]
-        pred_class = predictions[..., self.B * 5:]
-        assert torch.tensor(pred_class.shape).tolist() == [N, self.S, self.S, self.C]
-        # extract target objectness scores, target bounding boxes, and target class probabilities
-        target_conf = targets[..., self.B * 4:self.B * 5]
-        target_boxes = targets[..., :self.B * 4].reshape(N, self.S, self.S, self.B, 4)
-        target_class = targets[..., self.B * 5:]
+        iou_target, iou_mask, box_target, box_mask, class_target, class_mask = \
+            build_mask(N, H, W, B=self.B, C=self.C, dtype=dtype, device=device)
+        iou_mask *= self.lambda_noobj
 
-        # Compute the binary mask for the presence of objects in each grid cell.
-        # [N, S, S, B]
-        obj_mask = target_conf.clone()
-        obj_mask[obj_mask > 0] = 1
-        obj_mask[obj_mask <= 0] = 0
+        # grid coordinate
+        # [W] -> [H, W, B]
+        x_shift = torch.broadcast_to(torch.arange(W).reshape(1, W, 1),
+                                     (H, W, self.B)).to(dtype=dtype, device=device)
+        # [H] -> [H, 1] -> [H, W, B]
+        y_shift = torch.broadcast_to(torch.arange(H).reshape(H, 1, 1),
+                                     (H, W, self.B)).to(dtype=dtype, device=device)
 
-        # 计算损失如下：
-        # 1. 包含标注框的网格中响应框的坐标损失
-        # 2. 包含标注框的网格中响应框的置信度损失
-        # 3. 包含标注框的网格中不响应框的置信度损失
-        # 4. 不包含标注框的网格预测框的置信度损失
-        # 5. 包含标注框的网格分类损失
-        loss_for_coord = 0.
-        loss_for_response = 0.
-        loss_for_noresponse = 0.
-        loss_for_noobj = 0.
-        loss_for_cls = 0.
+        all_pred_boxes = outputs[..., :8].reshape(N, H, W, 2, 4)
+        all_pred_boxes = torch.sigmoid(all_pred_boxes)
+        all_pred_boxes[..., 0] += x_shift.expand(N, H, W, self.B)
+        all_pred_boxes[..., 1] += y_shift.expand(N, H, W, self.B)
 
-        cell_size = 1. / self.S
+        # [B, num_max_det, 5] -> [B, num_max_det] -> [B]
+        gt_num_objs = (targets.sum(dim=2) > 0).sum(dim=1)
 
-        # 遍历图像
         for ni in range(N):
-            # 遍历网格
-            for i in range(self.S):
-                for j in range(self.S):
-                    # 判断该网格是否包含标注框
-                    if obj_mask[ni, i, j, 0] == 1:
-                        # 计算IoU，IoU最大的设置为响应框，负责预测标注框
-                        # [B, 4]: [xc_offset, yc_offset, box_w, box_h]
-                        pred_grid_boxes = pred_boxes[ni, i, j]
-                        # [B]
-                        pred_xc = (pred_grid_boxes[:, 0] + i) * cell_size
-                        pred_yc = (pred_grid_boxes[:, 1] + j) * cell_size
-                        pred_w = pred_grid_boxes[:, 2]
-                        pred_h = pred_grid_boxes[:, 3]
-                        # 得到的预测结果是相对于图像宽高的比例
+            num_obj = gt_num_objs[ni]
+            if num_obj == 0:
+                iou_mask[ni, ...] = 0
+                continue
 
-                        # [xc, yc, w, h] -> [x1, y1, x2, y2]
-                        pred_x1 = pred_xc - 0.5 * pred_w
-                        pred_y1 = pred_yc - 0.5 * pred_h
-                        pred_x2 = pred_xc + 0.5 * pred_w
-                        pred_y2 = pred_yc + 0.5 * pred_h
+            gt_boxes = targets[ni][:num_obj][..., :4]
+            gt_cls_ids = targets[ni][:num_obj][..., 4]
 
-                        # [1, 4]
-                        target_grid_boxes = target_boxes[ni, i, j, 0].unsqueeze(0)
-                        # [1]
-                        target_xc = (target_grid_boxes[:, 0] * cell_size + i) * cell_size
-                        target_yc = (target_grid_boxes[:, 1] * cell_size + j) * cell_size
-                        target_w = target_grid_boxes[:, 2]
-                        target_h = target_grid_boxes[:, 3]
+            pred_boxes = all_pred_boxes[ni][..., :4].reshape(-1, 4)
 
-                        target_x1 = target_xc - 0.5 * target_w
-                        target_y1 = target_yc - 0.5 * target_h
-                        target_x2 = target_xc + 0.5 * target_w
-                        target_y2 = target_yc + 0.5 * target_h
+            # [H*W*B, 4] x [num_obj, 4] -> [H*W*B, num_obj] -> [H*W, B, num_obj]
+            ious = bboxes_iou(pred_boxes, gt_boxes, xyxy=False).reshape(H * W, self.B, num_obj)
+            max_iou, _ = torch.max(ious, dim=-1, keepdim=True)
 
-                        # iou([B, 4], [1, 4]) -> [B, 1]
-                        ious = bbox_iou(
-                            torch.concat((pred_x1, pred_y1, pred_x2, pred_y2)).reshape(self.B, 4),
-                            torch.concat((target_x1, target_y1, target_x2, target_y2)).reshape(1, 4)
-                        )
-                        max_iou_id = torch.argmax(ious).detach().cpu().item()
+            for oi in range(num_obj):
+                gt_box = gt_boxes[oi]
+                gt_class = gt_cls_ids[oi]
 
-                        # 计算网格分类损失
-                        loss_for_cls += F.mse_loss(pred_class[ni, i, j], target_class[ni, i, j], reduction='sum')
-                        for bi in range(self.B):
-                            if bi == max_iou_id:
-                                # 计算响应框置信度损失
-                                # ([1] - [1])**2
-                                loss_for_response += (pred_conf[ni, i, j, max_iou_id] - ious[max_iou_id][0]) ** 2
+                cell_idx_x, cell_idx_y = torch.floor(gt_box[:2])
+                cell_idx = cell_idx_y * W + cell_idx_x
+                cell_idx = cell_idx.long()
 
-                                # 计算坐标损失
-                                # [x_offset, y_offset]
-                                loss_for_coord += F.mse_loss(pred_boxes[ni, i, j, max_iou_id][:2],
-                                                             target_boxes[ni, i, j, max_iou_id][:2],
-                                                             reduction='sum')
-                                # [box_w, box_h]
-                                loss_for_coord += F.mse_loss(torch.sqrt(pred_boxes[ni, i, j, max_iou_id][2:]),
-                                                             torch.sqrt(target_boxes[ni, i, j, max_iou_id][2:]),
-                                                             reduction='sum')
-                            else:
-                                # 计算不响应框置信度损失
-                                loss_for_noresponse += (pred_conf[ni, i, j, bi] - 0.) ** 2
-                    else:
-                        # 不包含标注框，仅计算置信度损失
-                        # [B]
-                        loss_for_noobj += F.mse_loss(pred_conf[ni, i, j], target_conf[ni, i, j], reduction='sum')
+                class_target[ni, cell_idx, int(gt_class)] = 1
+                class_mask[ni, cell_idx, :] = 1
 
-        loss = self.lambda_coord * loss_for_coord + \
-               self.lambda_obj * loss_for_response + \
-               self.lambda_noobj * loss_for_noresponse + \
-               self.lambda_noobj * loss_for_noobj + \
-               self.lambda_class * loss_for_cls
-        return loss / N
+                # which predictor
+                ious_in_cell = ious[cell_idx, :, oi]
+                argmax_idx = torch.argmax(ious_in_cell)
 
+                target_delta = gt_box
+                target_delta[0] -= cell_idx_x
+                target_delta[1] -= cell_idx_y
 
-if __name__ == '__main__':
-    # torch.manual_seed(32)
-    #
-    # B = 2
-    # S = 7
-    # N_cls = 20
-    #
-    # m = YOLOv1Loss(S=S, B=B, C=N_cls)
-    # print(m)
-    #
-    # a = torch.randn(1, S, S, 5 * B + N_cls)
-    # b = torch.zeros(1, S, S, 5 * B + N_cls)
-    # b[:, 2, 3] = torch.abs(torch.randn(5 * B + N_cls))
-    # for bi in range(B):
-    #     b[:, 2, 3, 5 * bi + 4] = 1
-    # b[:, 2, 3, 5 * B + 8] = 1
-    # loss = m(a, b)
-    # print(loss)
-    #
-    # m = m.cuda()
-    # loss = m(a.cuda(), b.cuda())
-    # print(loss)
+                box_target[ni, cell_idx, argmax_idx, :] = target_delta
+                box_mask[ni, cell_idx, argmax_idx, :] = 1
 
-    # a = torch.abs(torch.randn(3, 4)) * 100
-    # # b = torch.abs(torch.randn(4, 4)) * 100
-    # b = torch.abs(torch.randn(1, 4)) * 100
-    # c = bbox_iou(a, b)
-    # print(c.shape)
-    # print(c)
-    #
-    # print(torch.argmax(c, dim=1))
+                iou_target[ni, cell_idx, argmax_idx] = max_iou[cell_idx, argmax_idx, :]
+                iou_mask[ni, cell_idx, argmax_idx] = self.lambda_obj
 
-    box1 = torch.abs(torch.randn(10, 4))
-    box2 = torch.abs(torch.randn(23, 4))
-    ious = bbox_iou(box1, box2)
-    print(ious.shape)
+        return iou_target.reshape(-1), \
+            iou_mask.reshape(-1), \
+            box_target.reshape(-1, 4), \
+            box_mask.reshape(-1, 1), \
+            class_target.reshape(-1, self.C), \
+            class_mask.reshape(-1, 1)
 
-    box1 = torch.abs(torch.randn(10, 4))
-    box2 = torch.abs(torch.randn(1, 4))
-    ious = bbox_iou(box1, box2)
-    print(ious.shape)
+    def forward(self, outputs, targets):
+        iou_target, iou_mask, box_target, box_mask, class_target, class_mask = \
+            self.build_target(outputs.detach().clone(), targets)
 
-    print(torch.argmax(ious))
+        N, H, W, n_ch = outputs.shape
+        assert H == W == self.S
+        assert n_ch == (5 * self.B + self.C)
+
+        outputs = torch.sigmoid(outputs)
+        # [N*H*W*B, 4]
+        pred_boxes = outputs[..., :(4 * self.B)].reshape(N, H, W, 2, 4).reshape(-1, 4)
+        # [N*H*W*B]
+        pred_confs = outputs[..., (4 * self.B):(5 * self.B)].reshape(-1)
+        # [N*H*W, C]
+        pred_probs = outputs[..., (5 * self.B):].reshape(-1, self.C)
+
+        # iou loss
+        pred_confs = pred_confs * iou_mask
+        iou_target = iou_target * iou_mask
+        loss_conf = F.mse_loss(pred_confs, iou_target, reduction='sum')
+
+        # box loss
+        pred_boxes = pred_boxes * box_mask
+        box_target = box_target * box_mask
+
+        loss_xy = F.mse_loss(pred_boxes[..., :2], box_target[..., :2], reduction='sum')
+        loss_wh = F.mse_loss(torch.sqrt(pred_boxes[..., 2:4]), torch.sqrt(box_target[..., 2:4]), reduction='sum')
+
+        # class loss
+        pred_probs = pred_probs * class_mask
+        class_target = class_target * class_mask
+
+        loss_class = F.mse_loss(pred_probs, class_target, reduction='sum')
+
+        # total
+        loss = (loss_xy + loss_wh) * self.lambda_coord + loss_conf + loss_class * self.lambda_class
+        return loss

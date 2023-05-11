@@ -10,10 +10,12 @@
 import os
 
 import torch
+from torch import Tensor
 import torch.nn as nn
 
 from classify import yolo
 
+from yolo.util.box_utils import xywh2xyxy
 from yolo.util import logging
 
 logger = logging.get_logger(__name__)
@@ -55,7 +57,70 @@ def conv_bn_act(in_channels: int,
     )
 
 
+class YOLOLayer(nn.Module):
+    """
+    YOLOLayer层操作：
+
+    1. 获取预测框数据 / 置信度数据 / 分类数据
+    2. 结合锚点框数据进行预测框坐标转换
+    """
+
+    stride = 64
+
+    def __init__(self, num_classes=20, S=7, B=2):
+        super(YOLOLayer, self).__init__()
+        self.num_classes = num_classes
+        self.S = S
+        self.B = B
+
+    def forward(self, outputs: Tensor):
+        N, H, W, n_ch = outputs.shape[:4]
+        assert n_ch == (5 * self.B + self.num_classes)
+        assert H == W == self.S
+
+        dtype = outputs.dtype
+        device = outputs.device
+
+        # grid coordinate
+        # [W] -> [1, 1, W, 1] -> [N, H, W, B]
+        x_shift = torch.broadcast_to(torch.arange(W).reshape(1, 1, W, 1),
+                                     (N, H, W, self.B)).to(dtype=dtype, device=device)
+        # [H] -> [1, H, 1, 1] -> [N, H, W, B]
+        y_shift = torch.broadcast_to(torch.arange(H).reshape(1, H, 1, 1),
+                                     (N, H, W, self.B)).to(dtype=dtype, device=device)
+
+        # x/y/w/h/conf/probs compress to [0,1]
+        outputs = torch.sigmoid(outputs)
+
+        pred_boxes = outputs[..., 4 * self.B].reshape(N, H, W, self.B, 4)
+        pred_confs = outputs[..., 4 * self.B:5 * self.B]
+        pred_probs = outputs[..., 5 * self.B:]
+
+        preds = torch.zeros(N, H, W, self.B, 5 + self.C)
+        preds[..., :4] = pred_boxes
+        preds[..., 4:5] = pred_confs.expand(N, H, W, self.B, 1)
+        preds[..., 5:] = pred_probs.expand(N, H, W, self.B, self.C)
+
+        # b_x = t_x + c_x
+        # b_y = t_y + c_y
+        # b_w = t_w
+        # b_h = t_h
+        #
+        # [N, H, W, 30] -> [N, H, W, 2, 5+20]
+        preds[..., 0] += x_shift
+        preds[..., 1] += y_shift
+
+        # Scale relative to image width/height
+        preds[..., :4] *= self.stride
+        # [xc, yc, w, h] -> [x1, y1, x2, y2]
+        preds[..., :4] = xywh2xyxy(preds[..., :4], is_center=True)
+        # [N, H, W, B, 5+num_classes] -> [B, H * W * B, 5+num_classes]
+        # n_ch: [x_c, y_c, w, h, conf, class_probs]
+        return preds.reshape(N, -1, 5 + self.num_classes)
+
+
 class YOLOv1(nn.Module):
+
     def __init__(self, num_classes=20, S=7, B=2, arch='yolov1', pretrained=None):
         super(YOLOv1, self).__init__()
 
@@ -63,6 +128,7 @@ class YOLOv1(nn.Module):
         self.S = S  # 特征图大小
         self.B = B  # 每个网格单元预测的边界框数量
         self.C = num_classes  # 对象类别数量
+        self.arch = arch
 
         if 'yolov1' == arch.lower():
             self.model = yolo.YOLOv1(num_classes=1000, S=4)
@@ -80,6 +146,8 @@ class YOLOv1(nn.Module):
             nn.Dropout(p=0.5),
             nn.Linear(4096, self.S * self.S * (5 * self.B + self.C)),
         )
+
+        self.yolo_layer = YOLOLayer(num_classes=num_classes, S=S, B=B)
 
         self.__init_weights(pretrained)
 
@@ -105,14 +173,15 @@ class YOLOv1(nn.Module):
                 state_dict = state_dict['state_dict']
             state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}  # strip the names
 
-            self.darknet.load_state_dict(state_dict, strict=True)
+            self.model.load_state_dict(state_dict, strict=True)
 
     def forward(self, x):
         x = self.model.features(x)
         # x = self.features(x)
         x = self.fc(x)
-        # 归一化到0-1
-        x = torch.sigmoid(x)
 
         x = x.reshape(-1, self.S, self.S, 5 * self.B + self.C)
-        return x
+        if self.training:
+            return x
+        else:
+            return self.yolo_layer(x)
