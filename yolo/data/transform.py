@@ -6,12 +6,15 @@
 @author: zj
 @description: 
 """
+import copy
 from typing import Dict, List
 
 import cv2
 
 from numpy import ndarray
 import numpy as np
+
+from yolo.util.box_utils import xyxy2xywh, xywh2xyxy
 
 
 def resize_and_pad(src_img, bboxes, dst_size, jitter_ratio=0.0, random_replacing=False):
@@ -48,7 +51,7 @@ def resize_and_pad(src_img, bboxes, dst_size, jitter_ratio=0.0, random_replacing
 
     # 先进行图像缩放，然后创建目标图像，填充ROI区域
     resized_img = cv2.resize(src_img, (dst_w, dst_h))
-    padded_img = np.zeros((dst_size, dst_size, 3), dtype=np.uint8) * 127
+    padded_img = np.ones((dst_size, dst_size, 3), dtype=np.uint8) * 127
     padded_img[dy:dy + dst_h, dx:dx + dst_w, :] = resized_img
 
     if len(bboxes) > 0:
@@ -125,38 +128,54 @@ def color_dithering(src_img, hue, saturation, exposure):
     return img
 
 
+def print_info(index, img, bboxes, bboxes_xxyy, img_size, img_info):
+    print(f"index: {index}")
+    print(f"img: {img.shape}")
+    print(f"bboxes:\n{bboxes}")
+    print(f"bboxes_xxyy:\n{bboxes_xxyy}")
+    print(f"img_size: {img_size}")
+    print(f"img_info: {img_info}")
+    print(f"bboxes_xxyy <= img_size:\n{bboxes_xxyy <= float(img_size)}")
+
+
 class Transform(object):
 
-    # def __init__(self, cfg: Dict, is_train: bool = True):
-    def __init__(self, is_train: bool = True):
+    def __init__(self, cfg: Dict, is_train: bool = True):
+        # def __init__(self, is_train: bool = True):
         self.is_train = is_train
 
         # 空间抖动
-        # self.jitter_ratio = cfg['AUGMENTATION']['JITTER']
-        self.jitter_ratio = 0.3
+        self.jitter_ratio = cfg['AUGMENTATION']['JITTER']
+        # self.jitter_ratio = 0.3
         # 随机放置
-        # self.random_placing = cfg['AUGMENTATION']['RANDOM_PLACING']
-        self.random_placing = True
+        self.random_placing = cfg['AUGMENTATION']['RANDOM_PLACING']
+        # self.random_placing = True
         # 左右翻转
-        # self.is_flip = cfg['AUGMENTATION']['RANDOM_HORIZONTAL_FLIP']
-        self.is_flip = True
+        self.is_flip = cfg['AUGMENTATION']['RANDOM_HORIZONTAL_FLIP']
+        # self.is_flip = True
         # 颜色抖动
-        # self.color_jitter = cfg['AUGMENTATION']['COLOR_DITHERING']
-        # self.hue = cfg['AUGMENTATION']['HUE']
-        # self.saturation = cfg['AUGMENTATION']['SATURATION']
-        # self.exposure = cfg['AUGMENTATION']['EXPOSURE']
-        self.color_jitter = True
-        self.hue = 0.1
-        self.saturation = 1.5
-        self.exposure = 1.5
+        self.color_jitter = cfg['AUGMENTATION']['COLOR_DITHERING']
+        self.hue = cfg['AUGMENTATION']['HUE']
+        self.saturation = cfg['AUGMENTATION']['SATURATION']
+        self.exposure = cfg['AUGMENTATION']['EXPOSURE']
+        # self.color_jitter = True
+        # self.hue = 0.1
+        # self.saturation = 1.5
+        # self.exposure = 1.5
 
-    def __call__(self, img: ndarray, bboxes: List, img_size: int):
+    def __call__(self, index: int, img: ndarray, bboxes: List, img_size: int):
         # BGR -> RGB
         img = img[:, :, ::-1]
         if self.is_train:
             # 首先进行缩放+填充+空间抖动
             img, bboxes, img_info = resize_and_pad(img, bboxes, img_size, self.jitter_ratio, self.random_placing)
-            assert np.all(bboxes <= img_size), print(img_info, '\n', bboxes)
+
+            # if len(bboxes) > 0:
+            #     bboxes_xxyy = xywh2xyxy(bboxes, is_center=False)
+            #     bboxes_xxyy = np.clip(bboxes_xxyy, 0., img_size - 0.0001)
+            #     assert np.all(bboxes_xxyy < img_size), print_info(index, img, bboxes, bboxes_xxyy, img_size, img_info)
+            #     bboxes = xyxy2xywh(bboxes_xxyy, is_center=False)
+
             # 然后进行左右翻转
             # img_info = []
             if self.is_flip and np.random.randn() > 0.5:
@@ -167,15 +186,11 @@ class Transform(object):
         else:
             # 进行缩放+填充，不执行空间抖动
             img, bboxes, img_info = resize_and_pad(img, bboxes, img_size, jitter_ratio=0., random_replacing=False)
-            assert np.all(bboxes <= img_size), print(img_info, '\n', bboxes)
+
+            # if len(bboxes) > 0:
+            #     bboxes_xxyy = xywh2xyxy(bboxes, is_center=False)
+            #     bboxes_xxyy = np.clip(bboxes_xxyy, 0., img_size - 0.0001)
+            #     assert np.all(bboxes_xxyy < img_size), print_info(index, img, bboxes, bboxes_xxyy, img_size, img_info)
+            #     bboxes = xyxy2xywh(bboxes_xxyy, is_center=False)
 
         return img, bboxes, img_info
-
-
-if __name__ == '__main__':
-    src_img = cv2.imread("../../assets/dog.jpg")
-    dst_img, bboxes = left_right_flip(src_img, [])
-
-    cv2.imshow("src", src_img)
-    cv2.imshow("dst", dst_img)
-    cv2.waitKey(0)
