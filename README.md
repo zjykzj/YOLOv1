@@ -35,6 +35,9 @@ YOLOv1 is the beginning of the YOLO series, which establishes the basic architec
 ## Thanks
 
 * [abeardear/pytorch-YOLO-v1](https://github.com/abeardear/pytorch-YOLO-v1)
+* [zjykzj/YOLOv2](https://github.com/zjykzj/YOLOv2)
+* [zjykzj/anchor-boxes](https://github.com/zjykzj/anchor-boxes)
+* [zjykzj/vocdev](https://github.com/zjykzj/vocdev)
 
 ## Contributing
 
