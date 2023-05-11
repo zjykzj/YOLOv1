@@ -96,10 +96,10 @@ class YOLOLayer(nn.Module):
         pred_confs = outputs[..., (self.B * 4):(self.B * 5)]
         pred_probs = outputs[..., (self.B * 5):]
 
-        preds = torch.zeros(N, H, W, self.B, 5 + self.C)
+        preds = torch.zeros(N, H, W, self.B, 5 + self.num_classes)
         preds[..., :4] = pred_boxes
         preds[..., 4:5] = pred_confs.expand(N, H, W, self.B, 1)
-        preds[..., 5:] = pred_probs.expand(N, H, W, self.B, self.C)
+        preds[..., 5:] = pred_probs.expand(N, H, W, self.B, self.num_classes)
 
         # b_x = t_x + c_x
         # b_y = t_y + c_y
@@ -147,7 +147,7 @@ class YOLOv1(nn.Module):
             nn.Linear(4096, self.S * self.S * (5 * self.B + self.C)),
         )
 
-        self.yolo_layer = YOLOLayer(num_classes=num_classes, S=S, B=B)
+        self.yolo_layer = YOLOLayer(num_classes=self.C, S=S, B=B)
 
         self.__init_weights(pretrained)
 
