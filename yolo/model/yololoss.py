@@ -92,10 +92,12 @@ class YOLOv1Loss(nn.Module):
         y_shift = torch.broadcast_to(torch.arange(H).reshape(H, 1, 1),
                                      (H, W, self.B)).to(dtype=dtype, device=device)
 
-        all_pred_boxes = outputs[..., :8].reshape(N, H, W, 2, 4)
+        all_pred_boxes = outputs[..., :(self.B * 4)].reshape(N, H, W, self.B, 4)
         all_pred_boxes = torch.sigmoid(all_pred_boxes)
         all_pred_boxes[..., 0] += x_shift.expand(N, H, W, self.B)
         all_pred_boxes[..., 1] += y_shift.expand(N, H, W, self.B)
+        all_pred_boxes[..., 2] *= W
+        all_pred_boxes[..., 3] *= H
 
         # [B, num_max_det, 5] -> [B, num_max_det] -> [B]
         gt_num_objs = (targets.sum(dim=2) > 0).sum(dim=1)
@@ -106,8 +108,10 @@ class YOLOv1Loss(nn.Module):
                 iou_mask[ni, ...] = 0
                 continue
 
-            gt_boxes = targets[ni][:num_obj][..., :4]
             gt_cls_ids = targets[ni][:num_obj][..., 4]
+            gt_boxes = targets[ni][:num_obj][..., :4]
+            gt_boxes[..., 0::2] *= W
+            gt_boxes[..., 1::2] *= H
 
             pred_boxes = all_pred_boxes[ni][..., :4].reshape(-1, 4)
 
@@ -157,11 +161,11 @@ class YOLOv1Loss(nn.Module):
 
         outputs = torch.sigmoid(outputs)
         # [N*H*W*B, 4]
-        pred_boxes = outputs[..., :(4 * self.B)].reshape(N, H, W, 2, 4).reshape(-1, 4)
+        pred_boxes = outputs[..., :(self.B * 4)].reshape(N, H, W, self.B, 4).reshape(-1, 4)
         # [N*H*W*B]
-        pred_confs = outputs[..., (4 * self.B):(5 * self.B)].reshape(-1)
+        pred_confs = outputs[..., (self.B * 4):(self.B * 5)].reshape(-1)
         # [N*H*W, C]
-        pred_probs = outputs[..., (5 * self.B):].reshape(-1, self.C)
+        pred_probs = outputs[..., (self.B * 5):].reshape(-1, self.C)
 
         # iou loss
         pred_confs = pred_confs * iou_mask
