@@ -146,7 +146,7 @@ class YOLOv1(nn.Module):
 
         # self.fc = nn.Sequential(
         #     conv_bn_act(1024, 1024, kernel_size=3, stride=1, padding=1,
-        #                 bias=False, is_bn=False, act='relu'),
+        #                 bias=False, is_bn=False, act='leaky_relu'),
         #     conv_bn_act(1024, self.B * 5 + self.C, kernel_size=1, stride=1, padding=0,
         #                 bias=True, is_bn=True, act='identity'),
         # )
