@@ -13,19 +13,29 @@ from yolo.model.yolov1 import YOLOv1
 
 
 def test_yolov1():
-    data = torch.randn(1, 3, 448, 448)
-    model = YOLOv1(S=7)
+    shape = (1, 3, 448, 448)
+    print(f"Input: {shape}")
+    data = torch.randn(shape)
+    model = YOLOv1(num_classes=20, S=7, B=2, arch='yolov1', pretrained=None)
+
+    model.train()
+    outputs = model(data)
+    print(outputs.shape)
+
     model.eval()
     outputs = model(data)
     print(outputs.shape)
 
-    data = torch.randn(1, 3, 224, 224)
+    shape = (1, 3, 224, 224)
+    print(f"Input: {shape}")
+    data = torch.randn(shape)
     model = YOLOv1(S=4)
+
+    model.train()
     outputs = model(data)
     print(outputs.shape)
 
-    data = torch.randn(1, 3, 224, 224)
-    model = YOLOv1(S=4)
+    model.eval()
     outputs = model(data)
     print(outputs.shape)
 

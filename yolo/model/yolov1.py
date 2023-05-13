@@ -10,13 +10,12 @@
 import os
 
 import torch
-from torch import Tensor
 import torch.nn as nn
+from torch import Tensor
 
 from classify import yolo
-
-from yolo.util.box_utils import xywh2xyxy
 from yolo.util import logging
+from yolo.util.box_utils import xywh2xyxy
 
 logger = logging.get_logger(__name__)
 
@@ -74,7 +73,7 @@ class YOLOLayer(nn.Module):
         self.B = B
 
     def forward(self, outputs: Tensor):
-        N, H, W, n_ch = outputs.shape[:4]
+        N, n_ch, H, W = outputs.shape[:4]
         assert n_ch == (5 * self.B + self.num_classes)
         assert H == W == self.S
 
@@ -89,17 +88,23 @@ class YOLOLayer(nn.Module):
         y_shift = torch.broadcast_to(torch.arange(H).reshape(1, H, 1, 1),
                                      (N, H, W, self.B)).to(dtype=dtype, device=device)
 
+        # [N, n_ch, H, W] -> [N, H, W, n_ch]
+        outputs = outputs.permute(0, 2, 3, 1)
         # x/y/w/h/conf/probs compress to [0,1]
         outputs = torch.sigmoid(outputs)
 
+        # [N, H, W, B*4] -> [N, H, W, B, 4]
         pred_boxes = outputs[..., :(self.B * 4)].reshape(N, H, W, self.B, 4)
+        # [N, H, W, B]
         pred_confs = outputs[..., (self.B * 4):(self.B * 5)]
+        # [N, H, W, num_classes]
         pred_probs = outputs[..., (self.B * 5):]
 
         preds = torch.zeros(N, H, W, self.B, 5 + self.num_classes)
         preds[..., :4] = pred_boxes
-        preds[..., 4:5] = pred_confs.expand(N, H, W, self.B, 1)
-        preds[..., 5:] = pred_probs.expand(N, H, W, self.B, self.num_classes)
+        preds[..., 4:5] = pred_confs.unsqueeze(-1)
+        # [N, H, W, num_classes] -> [N, H, W, 1, num_classes] -> [N, H, W, B, num_classes]
+        preds[..., 5:] = pred_probs.unsqueeze(-2).expand(N, H, W, self.B, self.num_classes)
 
         # b_x = t_x + c_x
         # b_y = t_y + c_y
@@ -137,15 +142,19 @@ class YOLOv1(nn.Module):
         else:
             raise ValueError(f"{arch} doesn't supports")
 
-        # self.fc = conv_bn_act(1024, self.B * 5 + self.C, kernel_size=3, stride=1, padding=1,
-        #                       bias=True, is_bn=True, act='identity')
         self.fc = nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(1024 * self.S * self.S, 4096),
-            nn.LeakyReLU(0.1, inplace=True),
-            nn.Dropout(p=0.5),
-            nn.Linear(4096, self.S * self.S * (5 * self.B + self.C)),
+            conv_bn_act(1024, 1024, kernel_size=3, stride=1, padding=1,
+                        bias=False, is_bn=False, act='relu'),
+            conv_bn_act(1024, self.B * 5 + self.C, kernel_size=1, stride=1, padding=0,
+                        bias=True, is_bn=True, act='identity'),
         )
+        # self.fc = nn.Sequential(
+        #     nn.Flatten(),
+        #     nn.Linear(1024 * self.S * self.S, 4096),
+        #     nn.LeakyReLU(0.1, inplace=True),
+        #     nn.Dropout(p=0.5),
+        #     nn.Linear(4096, self.S * self.S * (5 * self.B + self.C)),
+        # )
 
         self.yolo_layer = YOLOLayer(num_classes=self.C, S=S, B=B)
 
@@ -178,9 +187,10 @@ class YOLOv1(nn.Module):
     def forward(self, x):
         x = self.model.features(x)
         # x = self.features(x)
-        x = self.fc(x)
 
-        x = x.reshape(-1, self.S, self.S, 5 * self.B + self.C)
+        x = self.fc(x)
+        # x = x.reshape(-1, self.B * 5 + self.C, self.S, self.S)
+
         if self.training:
             return x
         else:
