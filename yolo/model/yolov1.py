@@ -100,7 +100,7 @@ class YOLOLayer(nn.Module):
         # [N, H, W, num_classes]
         pred_probs = outputs[..., (self.B * 5):]
 
-        preds = torch.zeros(N, H, W, self.B, 5 + self.num_classes)
+        preds = torch.zeros(N, H, W, self.B, 5 + self.num_classes).to(dtype=dtype, device=device)
         preds[..., :4] = pred_boxes
         preds[..., 4:5] = pred_confs.unsqueeze(-1)
         # [N, H, W, num_classes] -> [N, H, W, 1, num_classes] -> [N, H, W, B, num_classes]
@@ -108,12 +108,14 @@ class YOLOLayer(nn.Module):
 
         # b_x = t_x + c_x
         # b_y = t_y + c_y
-        # b_w = t_w
-        # b_h = t_h
+        # b_w = t_w * W
+        # b_h = t_h * H
         #
         # [N, H, W, 30] -> [N, H, W, 2, 5+20]
         preds[..., 0] += x_shift
         preds[..., 1] += y_shift
+        preds[..., 2] *= W
+        preds[..., 3] *= H
 
         # Scale relative to image width/height
         preds[..., :4] *= self.stride
@@ -142,19 +144,19 @@ class YOLOv1(nn.Module):
         else:
             raise ValueError(f"{arch} doesn't supports")
 
-        self.fc = nn.Sequential(
-            conv_bn_act(1024, 1024, kernel_size=3, stride=1, padding=1,
-                        bias=False, is_bn=False, act='relu'),
-            conv_bn_act(1024, self.B * 5 + self.C, kernel_size=1, stride=1, padding=0,
-                        bias=True, is_bn=True, act='identity'),
-        )
         # self.fc = nn.Sequential(
-        #     nn.Flatten(),
-        #     nn.Linear(1024 * self.S * self.S, 4096),
-        #     nn.LeakyReLU(0.1, inplace=True),
-        #     nn.Dropout(p=0.5),
-        #     nn.Linear(4096, self.S * self.S * (5 * self.B + self.C)),
+        #     conv_bn_act(1024, 1024, kernel_size=3, stride=1, padding=1,
+        #                 bias=False, is_bn=False, act='relu'),
+        #     conv_bn_act(1024, self.B * 5 + self.C, kernel_size=1, stride=1, padding=0,
+        #                 bias=True, is_bn=True, act='identity'),
         # )
+        self.fc = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(1024 * self.S * self.S, 4096),
+            nn.LeakyReLU(0.1, inplace=True),
+            nn.Dropout(p=0.5),
+            nn.Linear(4096, self.S * self.S * (5 * self.B + self.C)),
+        )
 
         self.yolo_layer = YOLOLayer(num_classes=self.C, S=S, B=B)
 
@@ -189,7 +191,7 @@ class YOLOv1(nn.Module):
         # x = self.features(x)
 
         x = self.fc(x)
-        # x = x.reshape(-1, self.B * 5 + self.C, self.S, self.S)
+        x = x.reshape(-1, self.B * 5 + self.C, self.S, self.S)
 
         if self.training:
             return x

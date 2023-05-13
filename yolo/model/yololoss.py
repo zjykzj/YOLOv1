@@ -73,29 +73,32 @@ class YOLOv1Loss(nn.Module):
         self.lambda_class = lambda_class
 
     def build_target(self, outputs, targets):
-        N, H, W, n_ch = outputs.shape
+        N, n_ch, H, W = outputs.shape
         assert n_ch == (self.B * 5 + self.C)
         assert H == W == self.S
 
         dtype = outputs.dtype
         device = outputs.device
 
+        # [N, n_ch, H, W] -> [N, H, W, n_ch]
+        outputs = outputs.permute(0, 2, 3, 1)
+
         iou_target, iou_mask, box_target, box_mask, class_target, class_mask = \
             build_mask(N, H, W, B=self.B, C=self.C, dtype=dtype, device=device)
         iou_mask *= self.lambda_noobj
 
         # grid coordinate
-        # [W] -> [H, W, B]
-        x_shift = torch.broadcast_to(torch.arange(W).reshape(1, W, 1),
-                                     (H, W, self.B)).to(dtype=dtype, device=device)
-        # [H] -> [H, 1] -> [H, W, B]
-        y_shift = torch.broadcast_to(torch.arange(H).reshape(H, 1, 1),
-                                     (H, W, self.B)).to(dtype=dtype, device=device)
+        # [W] -> [1, 1, W, 1] -> [N, H, W, B]
+        x_shift = torch.broadcast_to(torch.arange(W).reshape(1, 1, W, 1),
+                                     (N, H, W, self.B)).to(dtype=dtype, device=device)
+        # [H] -> [1, H, 1, 1] -> [N, H, W, B]
+        y_shift = torch.broadcast_to(torch.arange(H).reshape(1, H, 1, 1),
+                                     (N, H, W, self.B)).to(dtype=dtype, device=device)
 
         all_pred_boxes = outputs[..., :(self.B * 4)].reshape(N, H, W, self.B, 4)
         all_pred_boxes = torch.sigmoid(all_pred_boxes)
-        all_pred_boxes[..., 0] += x_shift.expand(N, H, W, self.B)
-        all_pred_boxes[..., 1] += y_shift.expand(N, H, W, self.B)
+        all_pred_boxes[..., 0] += x_shift
+        all_pred_boxes[..., 1] += y_shift
         all_pred_boxes[..., 2] *= W
         all_pred_boxes[..., 3] *= H
 
@@ -137,6 +140,8 @@ class YOLOv1Loss(nn.Module):
                 target_delta = gt_box
                 target_delta[0] -= cell_idx_x
                 target_delta[1] -= cell_idx_y
+                target_delta[2] /= W
+                target_delta[3] /= H
 
                 box_target[ni, cell_idx, argmax_idx, :] = target_delta
                 box_mask[ni, cell_idx, argmax_idx, :] = 1
@@ -147,19 +152,22 @@ class YOLOv1Loss(nn.Module):
         return iou_target.reshape(-1), \
             iou_mask.reshape(-1), \
             box_target.reshape(-1, 4), \
-            box_mask.reshape(-1, 1), \
+            box_mask.reshape(-1), \
             class_target.reshape(-1, self.C), \
-            class_mask.reshape(-1, 1)
+            class_mask.reshape(-1)
 
     def forward(self, outputs, targets):
         iou_target, iou_mask, box_target, box_mask, class_target, class_mask = \
             self.build_target(outputs.detach().clone(), targets)
 
-        N, H, W, n_ch = outputs.shape
+        N, n_ch, H, W = outputs.shape
         assert H == W == self.S
         assert n_ch == (5 * self.B + self.C)
 
+        outputs = outputs.permute(0, 2, 3, 1)
+        # Compres xywh/conf/prob to [0, 1]
         outputs = torch.sigmoid(outputs)
+
         # [N*H*W*B, 4]
         pred_boxes = outputs[..., :(self.B * 4)].reshape(N, H, W, self.B, 4).reshape(-1, 4)
         # [N*H*W*B]
@@ -168,23 +176,28 @@ class YOLOv1Loss(nn.Module):
         pred_probs = outputs[..., (self.B * 5):].reshape(-1, self.C)
 
         # iou loss
-        pred_confs = pred_confs * iou_mask
-        iou_target = iou_target * iou_mask
-        loss_conf = F.mse_loss(pred_confs, iou_target, reduction='sum')
+        pred_confs_obj = pred_confs[iou_mask == self.lambda_obj]
+        iou_target_obj = iou_target[iou_mask == self.lambda_obj]
+        loss_obj = F.mse_loss(pred_confs_obj, iou_target_obj, reduction='sum')
+
+        pred_confs_noobj = pred_confs[iou_mask == self.lambda_noobj]
+        iou_target_noobj = iou_target[iou_mask == self.lambda_noobj]
+        loss_noobj = F.mse_loss(pred_confs_noobj, iou_target_noobj, reduction='sum')
 
         # box loss
-        pred_boxes = pred_boxes * box_mask
-        box_target = box_target * box_mask
+        pred_boxes = pred_boxes[box_mask > 0]
+        box_target = box_target[box_mask > 0]
 
         loss_xy = F.mse_loss(pred_boxes[..., :2], box_target[..., :2], reduction='sum')
         loss_wh = F.mse_loss(torch.sqrt(pred_boxes[..., 2:4]), torch.sqrt(box_target[..., 2:4]), reduction='sum')
 
         # class loss
-        pred_probs = pred_probs * class_mask
-        class_target = class_target * class_mask
-
+        pred_probs = pred_probs[class_mask > 0]
+        class_target = class_target[class_mask > 0]
         loss_class = F.mse_loss(pred_probs, class_target, reduction='sum')
 
         # total
-        loss = (loss_xy + loss_wh) * self.lambda_coord + loss_conf + loss_class * self.lambda_class
+        loss = (loss_xy + loss_wh) * self.lambda_coord + \
+               loss_obj * self.lambda_obj + loss_noobj * self.lambda_noobj + \
+               loss_class * self.lambda_class
         return loss
