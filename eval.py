@@ -24,7 +24,7 @@ def parse_args():
     parser.add_argument('-c', '--cfg', type=str, default='configs/yolov2_voc.cfg', help='Path to config file')
     parser.add_argument('-ckpt', '--checkpoint', type=str, help='Path to checkpoint file')
 
-    parser.add_argument('--traversal', default=False, action="store_true", help='Using different input size.')
+    # parser.add_argument('--traversal', default=False, action="store_true", help='Using different input size.')
     parser.add_argument('--channels-last', type=bool, default=False)
     args = parser.parse_args()
     print("args:", args)
@@ -56,26 +56,37 @@ def main():
     conf_thresh = cfg['TEST']['CONFTHRE']
     nms_thresh = float(cfg['TEST']['NMSTHRE'])
 
-    if args.traversal:
-        item_list = list(range(0, 10))
-    else:
-        item_list = [int(cfg['TEST']['IMGSIZE'] / 32 - 10)]
+    # if args.traversal:
+    #     item_list = list(range(0, 10))
+    # else:
+    #     item_list = [int(cfg['TEST']['IMGSIZE'] / 32 - 10)]
 
     print("=> Begin evaluating ...")
     res_list = list()
 
-    for i in item_list:
-        input_size = (i % 10 + 10) * 32
-        cfg['TEST']['IMGSIZE'] = input_size
-        val_loader, _, val_evaluator = build_data(cfg, args.data, is_train=False, is_distributed=False)
-        # if hasattr(val_evaluator, 'save'):
-        #     val_evaluator.save = True
+    input_size = cfg['TEST']['IMGSIZE']
+    val_loader, _, val_evaluator = build_data(cfg, args.data, is_train=False, is_distributed=False)
+    # if hasattr(val_evaluator, 'save'):
+    #     val_evaluator.save = True
 
-        ap50_95, ap50 = validate(
-            val_loader, val_evaluator, model,
-            num_classes=num_classes, conf_thresh=conf_thresh, nms_thresh=nms_thresh, device=device)
-        print(f"Input Size：[{input_size}x{input_size}] ap50_95: = {ap50_95:.4f} ap50: = {ap50:.4f}")
-        res_list.append([input_size, ap50_95, ap50])
+    ap50_95, ap50 = validate(
+        val_loader, val_evaluator, model,
+        num_classes=num_classes, conf_thresh=conf_thresh, nms_thresh=nms_thresh, device=device)
+    print(f"Input Size：[{input_size}x{input_size}] ap50_95: = {ap50_95:.4f} ap50: = {ap50:.4f}")
+    res_list.append([input_size, ap50_95, ap50])
+
+    # for i in item_list:
+    #     input_size = (i % 10 + 10) * 32
+    #     cfg['TEST']['IMGSIZE'] = input_size
+    #     val_loader, _, val_evaluator = build_data(cfg, args.data, is_train=False, is_distributed=False)
+    #     # if hasattr(val_evaluator, 'save'):
+    #     #     val_evaluator.save = True
+    #
+    #     ap50_95, ap50 = validate(
+    #         val_loader, val_evaluator, model,
+    #         num_classes=num_classes, conf_thresh=conf_thresh, nms_thresh=nms_thresh, device=device)
+    #     print(f"Input Size：[{input_size}x{input_size}] ap50_95: = {ap50_95:.4f} ap50: = {ap50:.4f}")
+    #     res_list.append([input_size, ap50_95, ap50])
 
     print("=> End")
     for item in res_list:
