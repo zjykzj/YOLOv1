@@ -100,6 +100,7 @@
 ## Table of Contents
 
 - [Table of Contents](#table-of-contents)
+- [Latest News](#latest-news)
 - [Background](#background)
 - [Prepare Data](#prepare-data)
   - [Pascal VOC](#pascal-voc)
@@ -114,6 +115,10 @@
 - [Thanks](#thanks)
 - [Contributing](#contributing)
 - [License](#license)
+
+## Latest News
+
+***14/05/2023: Update Version ([v0.2.0](https://github.com/zjykzj/YOLOv1/releases/tag/v0.2.0)). Update VOC dataset training results for YOLOv1 and FastYOLOv1***
 
 ## Background
 
@@ -133,7 +138,7 @@ python voc2yolov5.py -s /home/zj/data/voc -d /home/zj/data/voc/voc2yolov5-val -l
 Then softlink the folder where the dataset is located to the specified location:
 
 ```shell
-ln -s /path/to/voc /path/to/YOLOv2/../datasets/voc
+ln -s /path/to/voc /path/to/YOLOv1/../datasets/voc
 ```
 
 ## Installation
@@ -147,7 +152,7 @@ See [NVIDIA/apex](https://github.com/NVIDIA/apex)
 Development environment (Use nvidia docker container)
 
 ```shell
-docker run --gpus all -it --rm -v </path/to/YOLOv2>:/app/YOLOv2 -v </path/to/voc>:/app/datasets/voc nvcr.io/nvidia/pytorch:22.08-py3
+docker run --gpus all -it --rm -v </path/to/YOLOv1>:/app/YOLOv1 -v </path/to/voc>:/app/datasets/voc nvcr.io/nvidia/pytorch:22.08-py3
 ```
 
 ## Usage
