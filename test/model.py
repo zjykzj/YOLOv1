@@ -18,7 +18,8 @@ def test_fastyolov1():
     shape = (1, 3, 448, 448)
     print(f"Input: {shape}")
     data = torch.randn(shape)
-    model = YOLOv1(num_classes=20, S=7, B=2, arch='FastYOLOv1', pretrained=None)
+    # model = YOLOv1(num_classes=20, S=7, B=2, arch='FastYOLOv1', pretrained=None)
+    model = YOLOv1(num_classes=20, S=14, B=2, stride=32, arch='FastYOLOv1', pretrained=None)
 
     model.train()
     outputs = model(data)
@@ -31,7 +32,7 @@ def test_fastyolov1():
     shape = (1, 3, 224, 224)
     print(f"Input: {shape}")
     data = torch.randn(shape)
-    model = YOLOv1(S=4)
+    model = YOLOv1(num_classes=20, S=7, B=2, stride=32, arch='FastYOLOv1', pretrained=None)
 
     model.train()
     outputs = model(data)
@@ -48,7 +49,8 @@ def test_yolov1():
     shape = (1, 3, 448, 448)
     print(f"Input: {shape}")
     data = torch.randn(shape)
-    model = YOLOv1(num_classes=20, S=7, B=2, arch='YOLOv1', pretrained=None)
+    # model = YOLOv1(num_classes=20, S=7, B=2, arch='YOLOv1', pretrained=None)
+    model = YOLOv1(num_classes=20, S=14, B=2, stride=32, arch='YOLOv1', pretrained=None)
 
     model.train()
     outputs = model(data)
@@ -61,7 +63,7 @@ def test_yolov1():
     shape = (1, 3, 224, 224)
     print(f"Input: {shape}")
     data = torch.randn(shape)
-    model = YOLOv1(S=4)
+    model = YOLOv1(num_classes=20, S=7, B=2, stride=32, arch='YOLOv1', pretrained=None)
 
     model.train()
     outputs = model(data)

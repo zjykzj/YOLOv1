@@ -26,6 +26,7 @@ def build_model(args: Namespace, cfg: Dict, device=None):
     if 'YOLOv1' == model_type:
         model = YOLOv1(S=cfg['MODEL']['S'],
                        B=cfg['MODEL']['B'],
+                       stride=cfg['MODEL']['STRIDE'],
                        num_classes=cfg['MODEL']['N_CLASSES'],
                        arch=cfg['MODEL']['BACKBONE'],
                        pretrained=cfg['MODEL']['BACKBONE_PRETRAINED']

@@ -64,13 +64,15 @@ class YOLOLayer(nn.Module):
     2. 结合锚点框数据进行预测框坐标转换
     """
 
-    stride = 64
+    # stride = 64
 
-    def __init__(self, num_classes=20, S=7, B=2):
+    def __init__(self, num_classes=20, S=7, B=2, stride=64):
         super(YOLOLayer, self).__init__()
         self.num_classes = num_classes
         self.S = S
         self.B = B
+
+        self.stride = stride
 
     def forward(self, outputs: Tensor):
         N, n_ch, H, W = outputs.shape[:4]
@@ -92,7 +94,7 @@ class YOLOLayer(nn.Module):
         outputs = outputs.permute(0, 2, 3, 1)
         # x/y/w/h/conf/probs compress to [0,1]
         # outputs = torch.sigmoid(outputs)
-        outputs = torch.sigmoid(outputs[..., self.B * 5])
+        outputs[..., :(self.B * 5)] = torch.sigmoid(outputs[..., :(self.B * 5)])
 
         # [N, H, W, B*4] -> [N, H, W, B, 4]
         pred_boxes = outputs[..., :(self.B * 4)].reshape(N, H, W, self.B, 4)
@@ -132,7 +134,7 @@ class YOLOLayer(nn.Module):
 
 class YOLOv1(nn.Module):
 
-    def __init__(self, num_classes=20, S=7, B=2, arch='yolov1', pretrained=None):
+    def __init__(self, num_classes=20, S=7, B=2, stride=64, arch='yolov1', pretrained=None):
         super(YOLOv1, self).__init__()
 
         self.num_classes = num_classes
@@ -148,21 +150,21 @@ class YOLOv1(nn.Module):
         else:
             raise ValueError(f"{arch} doesn't supports")
 
-        # self.fc = nn.Sequential(
-        #     conv_bn_act(1024, 1024, kernel_size=3, stride=1, padding=1,
-        #                 bias=False, is_bn=False, act='leaky_relu'),
-        #     conv_bn_act(1024, self.B * 5 + self.C, kernel_size=1, stride=1, padding=0,
-        #                 bias=True, is_bn=True, act='identity'),
-        # )
         self.fc = nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(1024 * self.S * self.S, 4096),
-            nn.LeakyReLU(0.1, inplace=True),
-            nn.Dropout(p=0.5),
-            nn.Linear(4096, self.S * self.S * (5 * self.B + self.C)),
+            conv_bn_act(1024, 1024, kernel_size=3, stride=1, padding=1,
+                        bias=False, is_bn=False, act='leaky_relu'),
+            conv_bn_act(1024, self.B * 5 + self.C, kernel_size=1, stride=1, padding=0,
+                        bias=True, is_bn=True, act='identity'),
         )
+        # self.fc = nn.Sequential(
+        #     nn.Flatten(),
+        #     nn.Linear(1024 * self.S * self.S, 4096),
+        #     nn.LeakyReLU(0.1, inplace=True),
+        #     nn.Dropout(p=0.5),
+        #     nn.Linear(4096, self.S * self.S * (5 * self.B + self.C)),
+        # )
 
-        self.yolo_layer = YOLOLayer(num_classes=self.C, S=S, B=B)
+        self.yolo_layer = YOLOLayer(num_classes=self.C, S=S, B=B, stride=stride)
 
         self.__init_weights(pretrained)
 
@@ -195,7 +197,7 @@ class YOLOv1(nn.Module):
         # x = self.features(x)
 
         x = self.fc(x)
-        x = x.reshape(-1, self.B * 5 + self.C, self.S, self.S)
+        # x = x.reshape(-1, self.B * 5 + self.C, self.S, self.S)
 
         if self.training:
             return x
