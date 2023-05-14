@@ -91,7 +91,8 @@ class YOLOLayer(nn.Module):
         # [N, n_ch, H, W] -> [N, H, W, n_ch]
         outputs = outputs.permute(0, 2, 3, 1)
         # x/y/w/h/conf/probs compress to [0,1]
-        outputs = torch.sigmoid(outputs)
+        # outputs = torch.sigmoid(outputs)
+        outputs = torch.sigmoid(outputs[..., self.B * 5])
 
         # [N, H, W, B*4] -> [N, H, W, B, 4]
         pred_boxes = outputs[..., :(self.B * 4)].reshape(N, H, W, self.B, 4)
@@ -116,6 +117,9 @@ class YOLOLayer(nn.Module):
         preds[..., 1] += y_shift
         preds[..., 2] *= W
         preds[..., 3] *= H
+
+        # 分类概率压缩
+        preds[..., 5:] = torch.softmax(preds[..., 5:], dim=-1)
 
         # Scale relative to image width/height
         preds[..., :4] *= self.stride
