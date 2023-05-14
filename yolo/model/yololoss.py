@@ -168,7 +168,7 @@ class YOLOv1Loss(nn.Module):
         outputs = outputs.permute(0, 2, 3, 1)
         # Compres xywh/conf/prob to [0, 1]
         # outputs = torch.sigmoid(outputs)
-        outputs = torch.sigmoid(outputs[..., self.B * 5])
+        outputs[..., :(self.B * 5)] = torch.sigmoid(outputs[..., :(self.B * 5)])
 
         # [N*H*W*B, 4]
         pred_boxes = outputs[..., :(self.B * 4)].reshape(N, H, W, self.B, 4).reshape(-1, 4)
