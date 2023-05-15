@@ -219,6 +219,7 @@ def main():
             ap50_95, ap50 = validate(
                 val_loader, val_evaluator, model,
                 num_classes=num_classes, conf_thresh=conf_thresh, nms_thresh=nms_thresh, device=device)
+            logger.info(f"AP50_95: {ap50_95} AP_50: {ap50}")
             logger.info("One epoch validate need: {:.3f}".format((time.time() - start)))
 
             # save checkpoint
