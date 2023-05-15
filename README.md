@@ -68,7 +68,7 @@
     <td class="tg-baqh">52.7</td>
     <td class="tg-c3ow"><span style="font-weight:400;font-style:normal">66.5</span></td>
     <td class="tg-c3ow">52.95</td>
-    <td class="tg-c3ow">43.65</td>
+    <td class="tg-c3ow">50.46</td>
   </tr>
   <tr>
     <td class="tg-7btt">conf_thre</td>
@@ -197,27 +197,27 @@ AP for train = 0.7180
 AP for tvmonitor = 0.5050
 Mean AP = 0.5295
 python eval.py -c configs/fastyolov1_voc.cfg -ckpt outputs/fastyolov1_voc/model_best.pth.tar ../datasets/voc
-AP for aeroplane = 0.5295
-AP for bicycle = 0.5318
-AP for bird = 0.3408
-AP for boat = 0.2591
-AP for bottle = 0.1142
-AP for bus = 0.5292
-AP for car = 0.4835
-AP for cat = 0.6586
-AP for chair = 0.1839
-AP for cow = 0.3956
-AP for diningtable = 0.4749
-AP for dog = 0.6314
-AP for horse = 0.6861
-AP for motorbike = 0.5643
-AP for person = 0.4172
-AP for pottedplant = 0.1275
-AP for sheep = 0.3334
-AP for sofa = 0.4925
-AP for train = 0.6360
-AP for tvmonitor = 0.3410
-Mean AP = 0.4365
+AP for aeroplane = 0.5606
+AP for bicycle = 0.6413
+AP for bird = 0.3991
+AP for boat = 0.3315
+AP for bottle = 0.1832
+AP for bus = 0.6381
+AP for car = 0.6030
+AP for cat = 0.6603
+AP for chair = 0.3017
+AP for cow = 0.5091
+AP for diningtable = 0.4467
+AP for dog = 0.5996
+AP for horse = 0.7081
+AP for motorbike = 0.6537
+AP for person = 0.5631
+AP for pottedplant = 0.2044
+AP for sheep = 0.4729
+AP for sofa = 0.5138
+AP for train = 0.5856
+AP for tvmonitor = 0.5157
+Mean AP = 0.5046
 ```
 
 ### Demo
