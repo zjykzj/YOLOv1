@@ -67,7 +67,7 @@
     <td class="tg-c3ow">63.4</td>
     <td class="tg-baqh">52.7</td>
     <td class="tg-c3ow"><span style="font-weight:400;font-style:normal">66.5</span></td>
-    <td class="tg-c3ow">52.95</td>
+    <td class="tg-c3ow">62.55</td>
     <td class="tg-c3ow">50.46</td>
   </tr>
   <tr>
@@ -175,27 +175,27 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 python -m torch.distributed.launch --nproc_per_node
 
 ```shell
 python eval.py -c configs/yolov1_voc.cfg -ckpt outputs/yolov1_voc/model_best.pth.tar ../datasets/voc
-AP for aeroplane = 0.6014
-AP for bicycle = 0.6346
-AP for bird = 0.4859
-AP for boat = 0.3508
-AP for bottle = 0.1631
-AP for bus = 0.6230
-AP for car = 0.5995
-AP for cat = 0.7344
-AP for chair = 0.3277
-AP for cow = 0.4905
-AP for diningtable = 0.5390
-AP for dog = 0.7042
-AP for horse = 0.7149
-AP for motorbike = 0.5984
-AP for person = 0.5217
-AP for pottedplant = 0.2070
-AP for sheep = 0.4724
-AP for sofa = 0.5994
-AP for train = 0.7180
-AP for tvmonitor = 0.5050
-Mean AP = 0.5295
+AP for aeroplane = 0.6436
+AP for bicycle = 0.7518
+AP for bird = 0.5866
+AP for boat = 0.4643
+AP for bottle = 0.2937
+AP for bus = 0.7235
+AP for car = 0.7132
+AP for cat = 0.7816
+AP for chair = 0.4393
+AP for cow = 0.6492
+AP for diningtable = 0.6090
+AP for dog = 0.7240
+AP for horse = 0.7831
+AP for motorbike = 0.7384
+AP for person = 0.6433
+AP for pottedplant = 0.3016
+AP for sheep = 0.6228
+AP for sofa = 0.6674
+AP for train = 0.7626
+AP for tvmonitor = 0.6117
+Mean AP = 0.6255
 python eval.py -c configs/fastyolov1_voc.cfg -ckpt outputs/fastyolov1_voc/model_best.pth.tar ../datasets/voc
 AP for aeroplane = 0.5606
 AP for bicycle = 0.6413
