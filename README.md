@@ -118,6 +118,8 @@
 
 ## Latest News
 
+***16/05/2023: Optimize Version ([v0.3.0](https://github.com/zjykzj/YOLOv1/releases/tag/v0.3.0)). Expand receptive field and use F.cross_entropy for class loss***
+
 ***14/05/2023: Update Version ([v0.2.0](https://github.com/zjykzj/YOLOv1/releases/tag/v0.2.0)). Update VOC dataset training results for YOLOv1 and FastYOLOv1***
 
 ## Background
