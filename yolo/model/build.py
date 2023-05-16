@@ -44,6 +44,7 @@ def build_criterion(cfg: Dict, device=None):
         criterion = YOLOv1Loss(S=cfg['MODEL']['S'],
                                B=cfg['MODEL']['B'],
                                C=cfg['MODEL']['N_CLASSES'],
+                               ignore_thresh=cfg['CRITERION']['IGNORE_THRESH'],
                                lambda_coord=cfg['CRITERION']['COORD_SCALE'],
                                lambda_obj=cfg['CRITERION']['OBJ_SCALE'],
                                lambda_noobj=cfg['CRITERION']['NOOBJ_SCALE'],

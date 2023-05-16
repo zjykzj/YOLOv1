@@ -63,11 +63,15 @@ def build_mask(N, H, W, B=2, C=20, dtype=torch.float, device=torch.device('cpu')
 
 class YOLOv1Loss(nn.Module):
 
-    def __init__(self, S=7, B=2, C=20, lambda_coord=5.0, lambda_obj=1.0, lambda_noobj=0.5, lambda_class=1.0):
+    def __init__(self, S=7, B=2, C=20, ignore_thresh=0.5,
+                 lambda_coord=5.0, lambda_obj=1.0, lambda_noobj=0.5, lambda_class=1.0):
         super(YOLOv1Loss, self).__init__()
         self.S = S
         self.B = B
         self.C = C
+
+        self.ignore_thresh = ignore_thresh
+
         self.lambda_coord = lambda_coord
         self.lambda_obj = lambda_obj
         self.lambda_noobj = lambda_noobj
@@ -120,7 +124,15 @@ class YOLOv1Loss(nn.Module):
 
             # [H*W*B, 4] x [num_obj, 4] -> [H*W*B, num_obj] -> [H*W, B, num_obj]
             ious = bboxes_iou(pred_boxes, gt_boxes, xyxy=False).reshape(H * W, self.B, num_obj)
+            # Maximum IoU corresponding to each prediction box
             max_iou, _ = torch.max(ious, dim=-1, keepdim=True)
+
+            # we ignore the gradient of predicted boxes whose IoU with any gt box is greater than cfg.threshold
+            # 对于正样本(iou大于阈值), 不参与计算
+            # [H*W, B, 1] -> [H*W*B] -> [n_pos]
+            n_pos = torch.nonzero(max_iou.view(-1) > self.ignore_thresh).numel()
+            if n_pos > 0:
+                iou_mask[ni][max_iou.squeeze() >= self.ignore_thresh] = 0
 
             for oi in range(num_obj):
                 gt_box = gt_boxes[oi]
