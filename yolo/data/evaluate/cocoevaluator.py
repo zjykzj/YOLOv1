@@ -25,6 +25,9 @@ class COCOEvaluator(Evaluator):
 
         self.class_ids = sorted(self.cocoGt.getCatIds())
 
+        self._init_list()
+
+    def _init_list(self):
         self.ids = list()
         self.data_list = list()
 
@@ -56,6 +59,8 @@ class COCOEvaluator(Evaluator):
     def result(self):
         annType = ['segm', 'bbox', 'keypoints']
 
+        ap50_95, ap50 = 0, 0
+
         # 计算完成所有测试图像的预测结果后
         # Evaluate the Dt (detection) json comparing with the ground truth
         if len(self.data_list) > 0:
@@ -69,6 +74,7 @@ class COCOEvaluator(Evaluator):
             cocoEval.accumulate()
             cocoEval.summarize()
             # AP50_95, AP50
-            return cocoEval.stats[0], cocoEval.stats[1]
-        else:
-            return 0, 0
+            ap50_95, ap50 = cocoEval.stats[0], cocoEval.stats[1]
+
+        self._init_list()
+        return ap50_95, ap50
