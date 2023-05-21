@@ -15,84 +15,81 @@
   <a href="http://commitizen.github.io/cz-cli/"><img src="https://img.shields.io/badge/commitizen-friendly-brightgreen.svg" alt=""></a>
 </p>
 
+* Train using the `VOC07+12 trainval` dataset and test using the `VOC2007 Test` dataset with an input size of `416x416`. give the result as follows
+
 <!-- <style type="text/css">
 .tg  {border-collapse:collapse;border-spacing:0;}
 .tg td{border-color:black;border-style:solid;border-width:1px;font-family:Arial, sans-serif;font-size:14px;
   overflow:hidden;padding:10px 5px;word-break:normal;}
 .tg th{border-color:black;border-style:solid;border-width:1px;font-family:Arial, sans-serif;font-size:14px;
   font-weight:normal;overflow:hidden;padding:10px 5px;word-break:normal;}
-.tg .tg-baqh{text-align:center;vertical-align:top}
-.tg .tg-c3ow{border-color:inherit;text-align:center;vertical-align:top}
-.tg .tg-7btt{border-color:inherit;font-weight:bold;text-align:center;vertical-align:top}
-.tg .tg-amwm{font-weight:bold;text-align:center;vertical-align:top}
+.tg .tg-ftdh{background-color:#FFF;border-color:inherit;color:#00E;font-weight:bold;text-align:center;text-decoration:underline;
+  vertical-align:top}
+.tg .tg-zkss{background-color:#FFF;border-color:inherit;color:#333;text-align:center;vertical-align:top}
+.tg .tg-vc3l{background-color:#FFF;border-color:inherit;color:#1F2328;text-align:center;vertical-align:top}
+.tg .tg-fr9f{background-color:#FFF;border-color:inherit;color:#333;font-weight:bold;text-align:center;vertical-align:top}
+.tg .tg-h2b0{background-color:#FFF;border-color:inherit;color:#333;text-align:center;vertical-align:middle}
+.tg .tg-17st{background-color:#FFF;border-color:inherit;color:#333;font-weight:bold;text-align:center;vertical-align:middle}
 </style> -->
 <table class="tg">
 <thead>
   <tr>
-    <th class="tg-c3ow"></th>
-    <th class="tg-7btt"><span style="font-style:normal">Original (darknet)</span></th>
-    <th class="tg-amwm"><span style="font-style:normal">Original (darknet)</span></th>
-    <th class="tg-7btt"><a href="https://github.com/abeardear" target="_blank" rel="noopener noreferrer"><span style="text-decoration:none">abeardear</span></a><span style="font-weight:400">/</span><a href="https://github.com/abeardear/pytorch-YOLO-v1" target="_blank" rel="noopener noreferrer">pytorch-YOLO-v1</a></th>
-    <th class="tg-7btt"><a href="https://github.com/zjykzj" target="_blank" rel="noopener noreferrer"><span style="text-decoration:none">zjykzj</span></a><span style="font-weight:400">/</span><a href="https://github.com/zjykzj/YOLOv1" target="_blank" rel="noopener noreferrer">YOLOv1</a>(This)</th>
-    <th class="tg-7btt"><a href="https://github.com/zjykzj" target="_blank" rel="noopener noreferrer"><span style="text-decoration:none">zjykzj</span></a><span style="font-weight:400">/</span><a href="https://github.com/zjykzj/YOLOv1" target="_blank" rel="noopener noreferrer">YOLOv1</a>(This)</th>
+    <th class="tg-fr9f"></th>
+    <th class="tg-fr9f">ARCH</th>
+    <th class="tg-ftdh">VOC AP[IoU=0.50]</th>
+    <th class="tg-ftdh">CONF_THRESH</th>
+    <th class="tg-ftdh">NMS_THRESH</th>
   </tr>
 </thead>
 <tbody>
   <tr>
-    <td class="tg-7btt">arch</td>
-    <td class="tg-c3ow">YOLOv1</td>
-    <td class="tg-baqh">FastYOLOv1</td>
-    <td class="tg-c3ow">ResNet_YOLOv1</td>
-    <td class="tg-c3ow">YOLOv1</td>
-    <td class="tg-c3ow">FastYOLOv1</td>
+    <td class="tg-fr9f"><span style="font-style:normal">Original (darknet)</span></td>
+    <td class="tg-fr9f">YOLOv1</td>
+    <td class="tg-h2b0">63.4</td>
+    <td class="tg-zkss">/</td>
+    <td class="tg-zkss">/</td>
   </tr>
   <tr>
-    <td class="tg-7btt">train</td>
-    <td class="tg-c3ow">VOC07+12 trainval</td>
-    <td class="tg-baqh">VOC07+12 trainval</td>
-    <td class="tg-c3ow">VOC07+12 trainval</td>
-    <td class="tg-c3ow">VOC07+12 trainval</td>
-    <td class="tg-c3ow">VOC07+12 trainval</td>
+    <td class="tg-fr9f"><span style="font-style:normal">Original (darknet)</span></td>
+    <td class="tg-zkss">FastYOLOv1</td>
+    <td class="tg-h2b0">52.7</td>
+    <td class="tg-zkss">/</td>
+    <td class="tg-zkss">/</td>
   </tr>
   <tr>
-    <td class="tg-7btt">val</td>
-    <td class="tg-c3ow">VOC2007 Test </td>
-    <td class="tg-baqh">VOC2007 Test </td>
-    <td class="tg-c3ow">VOC2007 Test </td>
-    <td class="tg-c3ow">VOC2007 Test </td>
-    <td class="tg-c3ow">VOC2007 Test </td>
+    <td class="tg-17st">abeardear/pytorch-YOLO-v1</td>
+    <td class="tg-zkss">ResNet_YOLOv1</td>
+    <td class="tg-h2b0">66.5</td>
+    <td class="tg-zkss">0.005</td>
+    <td class="tg-zkss">0.45</td>
   </tr>
   <tr>
-    <td class="tg-7btt">VOC AP[IoU=0.50]</td>
-    <td class="tg-c3ow">63.4</td>
-    <td class="tg-baqh">52.7</td>
-    <td class="tg-c3ow"><span style="font-weight:400;font-style:normal">66.5</span></td>
-    <td class="tg-c3ow">67.21</td>
-    <td class="tg-c3ow">54.93</td>
+    <td class="tg-17st">zjykzj/YOLOv1(This)</td>
+    <td class="tg-zkss">YOLOv1(S=14)</td>
+    <td class="tg-vc3l">67.21</td>
+    <td class="tg-zkss">0.005</td>
+    <td class="tg-zkss">0.45</td>
   </tr>
   <tr>
-    <td class="tg-7btt">conf_thre</td>
-    <td class="tg-c3ow">/</td>
-    <td class="tg-baqh">/</td>
-    <td class="tg-c3ow">0.5</td>
-    <td class="tg-c3ow">0.005</td>
-    <td class="tg-c3ow">0.005</td>
+    <td class="tg-fr9f">zjykzj/YOLOv1(This)</td>
+    <td class="tg-h2b0">FastYOLOv1<span style="font-weight:400;font-style:normal">(S=14)</span></td>
+    <td class="tg-h2b0">54.93</td>
+    <td class="tg-zkss">0.005</td>
+    <td class="tg-zkss">0.45</td>
   </tr>
   <tr>
-    <td class="tg-7btt">nms_thre</td>
-    <td class="tg-c3ow">/</td>
-    <td class="tg-baqh">/</td>
-    <td class="tg-c3ow">/</td>
-    <td class="tg-c3ow">0.45</td>
-    <td class="tg-c3ow">0.45</td>
+    <td class="tg-fr9f">zjykzj/YOLOv1(This)</td>
+    <td class="tg-h2b0">YOLOv1</td>
+    <td class="tg-vc3l">62.55</td>
+    <td class="tg-zkss">0.005</td>
+    <td class="tg-zkss">0.45</td>
   </tr>
   <tr>
-    <td class="tg-7btt">input_size</td>
-    <td class="tg-c3ow">448</td>
-    <td class="tg-baqh">448</td>
-    <td class="tg-c3ow">448</td>
-    <td class="tg-c3ow">448</td>
-    <td class="tg-c3ow">448</td>
+    <td class="tg-fr9f">zjykzj/YOLOv1(This)</td>
+    <td class="tg-h2b0">FastYOLOv1</td>
+    <td class="tg-h2b0">50.46</td>
+    <td class="tg-zkss">0.005</td>
+    <td class="tg-zkss">0.45</td>
   </tr>
 </tbody>
 </table>
@@ -167,19 +164,19 @@ docker run --gpus all -it --rm -v </path/to/YOLOv1>:/app/YOLOv1 -v </path/to/voc
 * One GPU
 
 ```shell
-CUDA_VISIBLE_DEVICES=0 python main_amp.py -c configs/yolov1_voc.cfg --opt-level=O1 ../datasets/voc
+CUDA_VISIBLE_DEVICES=0 python main_amp.py -c configs/yolov1_s14_voc.cfg --opt-level=O1 ../datasets/voc
 ```
 
 * Multi-GPUs
 
 ```shell
-CUDA_VISIBLE_DEVICES=0,1,2,3 python -m torch.distributed.launch --nproc_per_node=4 --master_port "36121" main_amp.py -c configs/yolov1_voc.cfg --opt-level=O1 ../datasets/voc
+CUDA_VISIBLE_DEVICES=0,1,2,3 python -m torch.distributed.launch --nproc_per_node=4 --master_port "36121" main_amp.py -c configs/yolov1_s14_voc.cfg --opt-level=O1 ../datasets/voc
 ```
 
 ### Eval
 
 ```shell
-python eval.py -c configs/yolov1_voc.cfg -ckpt outputs/yolov1_voc/model_best.pth.tar ../datasets/voc
+python eval.py -c configs/yolov1_s14_voc.cfg -ckpt outputs/yolov1_s14_voc/model_best.pth.tar ../datasets/voc
 AP for aeroplane = 0.7092                                                                                                                                                                                          
 AP for bicycle = 0.7833                                                                                                                                                                                            
 AP for bird = 0.6309                                                                                                                                                                                               
@@ -201,7 +198,7 @@ AP for sofa = 0.6840
 AP for train = 0.7625
 AP for tvmonitor = 0.7015
 Mean AP = 0.6721
-python eval.py -c configs/fastyolov1_voc.cfg -ckpt outputs/fastyolov1_voc/model_best.pth.tar ../datasets/voc
+python eval.py -c configs/fastyolov1_s14_voc.cfg -ckpt outputs/fastyolov1_s14_voc/model_best.pth.tar ../datasets/voc
 AP for aeroplane = 0.5919
 AP for bicycle = 0.6932
 AP for bird = 0.4562
@@ -228,7 +225,7 @@ Mean AP = 0.5493
 ### Demo
 
 ```shell
-python demo.py -c 0.4 configs/yolov1_voc.cfg outputs/yolov1_voc/model_best.pth.tar --exp voc assets/voc2007-test/
+python demo.py -c 0.4 configs/yolov1_s14_voc.cfg outputs/yolov1_s14_voc/model_best.pth.tar --exp voc assets/voc2007-test/
 ```
 
 <p align="left"><img src="results/voc/000237.jpg" height="240"\>  <img src="results/voc/000386.jpg" height="240"\></p>
