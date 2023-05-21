@@ -44,11 +44,12 @@ def conv_bn_act(in_channels: int,
 
 
 class FastYOLOv1(nn.Module):
-    def __init__(self, num_classes=1000, S=7):
+
+    def __init__(self, num_classes=1000, is_expand=False):
         super(FastYOLOv1, self).__init__()
 
         self.num_classes = num_classes
-        self.S = S
+        self.is_expand = is_expand
 
         self.features = nn.Sequential(
             # [1]
@@ -73,7 +74,7 @@ class FastYOLOv1(nn.Module):
 
             # [6]
             conv_bn_act(256, 512, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-            # nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Identity() if self.is_expand else nn.MaxPool2d(kernel_size=2, stride=2),
 
             # [7] -> [9]
             conv_bn_act(512, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
@@ -102,11 +103,12 @@ class FastYOLOv1(nn.Module):
 
 
 class YOLOv1(nn.Module):
-    def __init__(self, num_classes=1000, S=7):
+
+    def __init__(self, num_classes=1000, is_expand=False):
         super(YOLOv1, self).__init__()
 
         self.num_classes = num_classes
-        self.S = S  # 特征图大小
+        self.is_expand = is_expand
 
         self.features = nn.Sequential(
             # [1]
@@ -143,8 +145,10 @@ class YOLOv1(nn.Module):
             conv_bn_act(1024, 512, kernel_size=1, stride=1, padding=0, bias=False, is_bn=True, act='leaky_relu'),
             conv_bn_act(512, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
             conv_bn_act(1024, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-            # conv_bn_act(1024, 1024, kernel_size=3, stride=2, padding=1, bias=False, is_bn=True, act='leaky_relu'),
-            conv_bn_act(1024, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
+            conv_bn_act(1024, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True,
+                        act='leaky_relu') if self.is_expand else conv_bn_act(1024, 1024, kernel_size=3, stride=2,
+                                                                             padding=1, bias=False, is_bn=True,
+                                                                             act='leaky_relu'),
 
             # [23] -> [24]
             conv_bn_act(1024, 1024, kernel_size=3, stride=1, padding=1, bias=False, is_bn=True, act='leaky_relu'),
@@ -173,33 +177,46 @@ class YOLOv1(nn.Module):
 
 if __name__ == '__main__':
     data = torch.randn(1, 3, 448, 448)
-    # model = YOLOv1(S=7)
-    model = YOLOv1(S=14)
+    model = YOLOv1(is_expand=False)
+    outputs = model(data)
+    print(outputs.shape)
+
+    model = YOLOv1(is_expand=True)
     outputs = model(data)
     print(outputs.shape)
 
     data = torch.randn(1, 3, 224, 224)
-    # model = YOLOv1(S=4)
-    model = YOLOv1(S=7)
+    model = YOLOv1(is_expand=False)
+    outputs = model(data)
+    print(outputs.shape)
+
+    model = YOLOv1(is_expand=True)
     outputs = model(data)
     print(outputs.shape)
 
     data = torch.randn(1, 3, 224, 224)
-    # model = YOLOv1(S=4)
-    model = YOLOv1(S=7)
+    model = YOLOv1(is_expand=False)
+    outputs = model(data)
+    print(outputs.shape)
+
+    model = YOLOv1(is_expand=True)
     outputs = model(data)
     print(outputs.shape)
 
     data = torch.randn(1, 3, 448, 448)
-    # model = FastYOLOv1(S=7)
-    model = FastYOLOv1(S=14)
+    model = FastYOLOv1(is_expand=False)
+    outputs = model(data)
+    print(outputs.shape)
+
+    model = FastYOLOv1(is_expand=True)
     outputs = model(data)
     print(outputs.shape)
 
     data = torch.randn(1, 3, 224, 224)
-    # model = FastYOLOv1(S=3)
-    model = FastYOLOv1(S=7)
+    model = FastYOLOv1(is_expand=False)
     outputs = model(data)
     print(outputs.shape)
 
-
+    model = FastYOLOv1(is_expand=True)
+    outputs = model(data)
+    print(outputs.shape)
