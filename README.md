@@ -56,7 +56,7 @@
     <td class="tg-d5y0">FastYOLOv1</td>
   </tr>
   <tr>
-    <td class="tg-fr9f">zjykzj/YOLOv1(This)</td>
+    <td class="tg-fr9f">VOC AP[IoU=0.50]</td>
     <td class="tg-zkss">63.4</td>
     <td class="tg-9y4h">52.7</td>
     <td class="tg-9y4h">66.5</td>
