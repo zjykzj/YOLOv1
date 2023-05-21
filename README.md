@@ -17,79 +17,53 @@
 
 * Train using the `VOC07+12 trainval` dataset and test using the `VOC2007 Test` dataset with an input size of `416x416`. give the result as follows
 
-<!-- <style type="text/css">
+<style type="text/css">
 .tg  {border-collapse:collapse;border-spacing:0;}
 .tg td{border-color:black;border-style:solid;border-width:1px;font-family:Arial, sans-serif;font-size:14px;
   overflow:hidden;padding:10px 5px;word-break:normal;}
 .tg th{border-color:black;border-style:solid;border-width:1px;font-family:Arial, sans-serif;font-size:14px;
   font-weight:normal;overflow:hidden;padding:10px 5px;word-break:normal;}
-.tg .tg-ftdh{background-color:#FFF;border-color:inherit;color:#00E;font-weight:bold;text-align:center;text-decoration:underline;
-  vertical-align:top}
 .tg .tg-zkss{background-color:#FFF;border-color:inherit;color:#333;text-align:center;vertical-align:top}
-.tg .tg-vc3l{background-color:#FFF;border-color:inherit;color:#1F2328;text-align:center;vertical-align:top}
+.tg .tg-chko{background-color:#FFF;color:#1F2328;text-align:center;vertical-align:middle}
+.tg .tg-baqh{text-align:center;vertical-align:top}
 .tg .tg-fr9f{background-color:#FFF;border-color:inherit;color:#333;font-weight:bold;text-align:center;vertical-align:top}
-.tg .tg-h2b0{background-color:#FFF;border-color:inherit;color:#333;text-align:center;vertical-align:middle}
-.tg .tg-17st{background-color:#FFF;border-color:inherit;color:#333;font-weight:bold;text-align:center;vertical-align:middle}
-</style> -->
+.tg .tg-y5w1{background-color:#FFF;border-color:inherit;color:#00E;font-weight:bold;text-align:center;vertical-align:top}
+.tg .tg-d5y0{background-color:#FFF;color:#1F2328;text-align:center;vertical-align:top}
+.tg .tg-9y4h{background-color:#FFF;border-color:inherit;color:#1F2328;text-align:center;vertical-align:middle}
+</style>
 <table class="tg">
 <thead>
   <tr>
     <th class="tg-fr9f"></th>
-    <th class="tg-fr9f">ARCH</th>
-    <th class="tg-ftdh">VOC AP[IoU=0.50]</th>
-    <th class="tg-ftdh">CONF_THRESH</th>
-    <th class="tg-ftdh">NMS_THRESH</th>
+    <th class="tg-fr9f"><span style="font-style:normal">Original (darknet)</span></th>
+    <th class="tg-y5w1">Original (darknet)</th>
+    <th class="tg-y5w1">abeardear/pytorch-YOLO-v1</th>
+    <th class="tg-baqh">zjykzj/YOLOv1(This)</th>
+    <th class="tg-baqh">zjykzj/YOLOv1(This)</th>
+    <th class="tg-baqh">zjykzj/YOLOv1(This)</th>
+    <th class="tg-baqh">zjykzj/YOLOv1(This)</th>
   </tr>
 </thead>
 <tbody>
   <tr>
-    <td class="tg-fr9f"><span style="font-style:normal">Original (darknet)</span></td>
-    <td class="tg-fr9f">YOLOv1</td>
-    <td class="tg-h2b0">63.4</td>
-    <td class="tg-zkss">/</td>
-    <td class="tg-zkss">/</td>
-  </tr>
-  <tr>
-    <td class="tg-fr9f"><span style="font-style:normal">Original (darknet)</span></td>
+    <td class="tg-fr9f">ARCH</td>
+    <td class="tg-zkss">YOLOv1</td>
     <td class="tg-zkss">FastYOLOv1</td>
-    <td class="tg-h2b0">52.7</td>
-    <td class="tg-zkss">/</td>
-    <td class="tg-zkss">/</td>
-  </tr>
-  <tr>
-    <td class="tg-17st">abeardear/pytorch-YOLO-v1</td>
     <td class="tg-zkss">ResNet_YOLOv1</td>
-    <td class="tg-h2b0">66.5</td>
-    <td class="tg-zkss">0.005</td>
-    <td class="tg-zkss">0.45</td>
-  </tr>
-  <tr>
-    <td class="tg-17st">zjykzj/YOLOv1(This)</td>
-    <td class="tg-zkss">YOLOv1(S=14)</td>
-    <td class="tg-vc3l">67.21</td>
-    <td class="tg-zkss">0.005</td>
-    <td class="tg-zkss">0.45</td>
+    <td class="tg-baqh"><span style="font-weight:400;font-style:normal">YOLOv1(S=14)</span></td>
+    <td class="tg-chko">FastYOLOv1(S=14)</td>
+    <td class="tg-baqh"><span style="font-weight:400;font-style:normal">YOLOv1</span></td>
+    <td class="tg-d5y0">FastYOLOv1</td>
   </tr>
   <tr>
     <td class="tg-fr9f">zjykzj/YOLOv1(This)</td>
-    <td class="tg-h2b0">FastYOLOv1<span style="font-weight:400;font-style:normal">(S=14)</span></td>
-    <td class="tg-h2b0">54.93</td>
-    <td class="tg-zkss">0.005</td>
-    <td class="tg-zkss">0.45</td>
-  </tr>
-  <tr>
-    <td class="tg-fr9f">zjykzj/YOLOv1(This)</td>
-    <td class="tg-h2b0">YOLOv1</td>
-    <td class="tg-vc3l">62.55</td>
-    <td class="tg-zkss">0.005</td>
-    <td class="tg-zkss">0.45</td>
-  </tr>
-  <tr>
-    <td class="tg-fr9f">zjykzj/YOLOv1(This)</td>
-    <td class="tg-h2b0">FastYOLOv1</td>
-    <td class="tg-h2b0">50.46</td>
-    <td class="tg-zkss">0.005</td>
-    <td class="tg-zkss">0.45</td>
+    <td class="tg-zkss">63.4</td>
+    <td class="tg-9y4h">52.7</td>
+    <td class="tg-9y4h">66.5</td>
+    <td class="tg-baqh">67.21</td>
+    <td class="tg-baqh">54.93</td>
+    <td class="tg-baqh">62.55</td>
+    <td class="tg-baqh">50.46</td>
   </tr>
 </tbody>
 </table>
