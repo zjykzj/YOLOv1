@@ -77,7 +77,7 @@ class YOLOLayer(nn.Module):
     def forward(self, outputs: Tensor):
         N, n_ch, H, W = outputs.shape[:4]
         assert n_ch == (5 * self.B + self.num_classes)
-        assert H == W == self.S
+        assert H == W == self.S, f'H={H} W={W} S={self.S}'
 
         dtype = outputs.dtype
         device = outputs.device
@@ -144,9 +144,13 @@ class YOLOv1(nn.Module):
         self.arch = arch
 
         if 'yolov1' == arch.lower():
-            self.model = yolo.YOLOv1(num_classes=1000, S=4)
+            self.model = yolo.YOLOv1(num_classes=1000, is_expand=False)
         elif 'fastyolov1' == arch.lower():
-            self.model = yolo.FastYOLOv1(num_classes=1000, S=3)
+            self.model = yolo.FastYOLOv1(num_classes=1000, is_expand=False)
+        elif 'optimized_yolov1' == arch.lower():
+            self.model = yolo.YOLOv1(num_classes=1000, is_expand=True)
+        elif 'optimized_fastyolov1' == arch.lower():
+            self.model = yolo.FastYOLOv1(num_classes=1000, is_expand=True)
         else:
             raise ValueError(f"{arch} doesn't supports")
 
