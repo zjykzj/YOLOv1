@@ -15,7 +15,6 @@ from torch.utils.data import DataLoader
 
 import torch.utils.data.distributed
 
-from yolo.data.dataset import KEY_IMAGE_INFO, KEY_IMAGE_ID
 from yolo.data.evaluate.evaluator import Evaluator
 from yolo.util.metric import AverageMeter
 from yolo.util.utils import postprocess
@@ -28,7 +27,7 @@ logger = logging.get_logger(__name__)
 def validate(val_loader: DataLoader,
              val_evaluator: Evaluator,
              model: Module,
-             num_classes: int = 20,
+             num_classes,
              conf_thresh: float = 0.005,
              nms_thresh: float = 0.45,
              device: torch.device = None):
@@ -41,18 +40,18 @@ def validate(val_loader: DataLoader,
     for i, (input_data, targets) in enumerate(tqdm(val_loader)):
         # 模型推理，返回预测结果
         # img: [B, 3, 416, 416]
-        outputs = model(input_data.to(device))
+        outputs = model(input_data.to(device=device, dtype=torch.float))
         # 后处理，进行置信度阈值过滤 + NMS阈值过滤
         # 输入outputs: [B, 预测框数目, 85(xywh + obj_confg + num_classes)]
         # 输出outputs: [B, 过滤后的预测框数目, 7(xyxy + obj_conf + cls_prob + cls_id)]
         outputs = postprocess(outputs, num_classes, conf_thresh, nms_thresh)
 
-        for i, output in enumerate(outputs):
+        for idx, (output, target) in enumerate(zip(outputs, targets)):
             if output is None:
                 continue
 
-            img_info = [x[i].item() for x in targets[KEY_IMAGE_INFO]]
-            img_info.append(targets[KEY_IMAGE_ID][i])
+            img_info = target.img_info
+            img_info.append(target.img_id)
 
             # 提取单张图片的运行结果
             # [N_ind, 7]

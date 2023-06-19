@@ -6,19 +6,21 @@
 @author: zj
 @description: 
 """
+from typing import Optional, List, Union
 import os
 import cv2
 import glob
 import copy
 
 import numpy as np
+from numpy import ndarray
 
 import torch
 from torch.utils.data import Dataset
 from torch.utils.data.dataset import T_co
 
-from . import KEY_IMAGE_ID, KEY_TARGET, KEY_IMAGE_INFO
 from ..transform import Transform
+from ..target import Target
 from yolo.util.box_utils import label2yolobox
 
 
@@ -52,7 +54,6 @@ class VOCDataset(Dataset):
         self.label_path_list = sorted(glob.glob(os.path.join(label_dir, '*.txt')))
         assert len(self.image_path_list) == len(self.label_path_list)
 
-        box_list = list()
         label_list = list()
         for image_path, label_path in zip(self.image_path_list, self.label_path_list):
             img_name = os.path.basename(image_path).rstrip('.jpg')
@@ -62,7 +63,6 @@ class VOCDataset(Dataset):
             image = cv2.imread(image_path)
             img_h, img_w = image.shape[:2]
 
-            sub_box_list = list()
             sub_label_list = list()
             # [[cls_id, x_center, y_center, box_w, box_h], ]
             # The coordinate size is relative to the width and height of the image
@@ -70,86 +70,76 @@ class VOCDataset(Dataset):
             if len(boxes.shape) == 1:
                 boxes = [boxes]
             for label, xc, yc, box_w, box_h in boxes:
+                # xc/yc/box_w/box_h -> x1/y1/box_w/box_h
                 x_min = (xc - 0.5 * box_w) * img_w
                 y_min = (yc - 0.5 * box_h) * img_h
                 assert x_min >= 0 and y_min >= 0
-
                 box_w = box_w * img_w
                 box_h = box_h * img_h
-                if (x_min + box_w) >= img_w:
-                    box_w = img_w - x_min - 1
-                if (y_min + box_h) >= img_h:
-                    box_h = img_h - y_min - 1
 
                 # 转换成原始大小，方便后续图像预处理阶段进行转换和调试
-                sub_box_list.append([x_min, y_min, box_w, box_h])
-                sub_label_list.append(int(label))
-            box_list.append(np.array(sub_box_list))
-            label_list.append(sub_label_list)
+                sub_label_list.append([label, x_min, y_min, box_w, box_h])
+            label_list.append(np.array(sub_label_list, dtype=float))
 
-        self.box_list = np.array(box_list, dtype=object)
         self.label_list = label_list
         self.num_classes = len(self.classes)
 
     def __getitem__(self, index) -> T_co:
-        image_path = self.image_path_list[index]
-        boxes = copy.deepcopy(self.box_list[index])
+        img_file = self.image_path_list[index]
         labels = copy.deepcopy(self.label_list[index])
 
-        image = cv2.imread(image_path)
+        image, img_info, labels = self.build_image(index, img_file, labels)
+        target = self.build_target(labels, img_info, img_file)
+        return image, target
 
+    def build_image(self, index: int, img_file: str, labels: ndarray):
+        # 读取图像
+        image = cv2.imread(img_file)
+
+        # import copy
         # src_img = copy.deepcopy(image)
-        # for box in boxes:
-        #     x_min, y_min, box_w, box_h = box
-        #     cv2.rectangle(src_img, (int(x_min), int(y_min)), (int(x_min + box_w), int(y_min + box_h)),
-        #                   (255, 255, 255), 1)
+        # if len(labels) > 0:
+        #     for box in labels[:, 1:]:
+        #         x_min, y_min, box_w, box_h = box
+        #         cv2.rectangle(src_img, (int(x_min), int(y_min)), (int(x_min + box_w), int(y_min + box_h)),
+        #                       (0, 0, 255), 1)
         # cv2.imshow('src_img', src_img)
+        # # cv2.imwrite('src_img.jpg', src_img)
 
         img_info = None
         if self.transform is not None:
-            image, boxes, img_info = self.transform(index, image, boxes, self.target_size)
+            image, labels, img_info = self.transform(index, self.target_size, image, labels)
 
         # dst_img = copy.deepcopy(image).astype(np.uint8)
         # dst_img = cv2.cvtColor(dst_img, cv2.COLOR_RGB2BGR)
-        # for box in boxes:
-        #     x_min, y_min, box_w, box_h = box
-        #     cv2.rectangle(dst_img, (int(x_min), int(y_min)), (int(x_min + box_w), int(y_min + box_h)),
-        #                   (255, 255, 255), 1)
+        # if len(labels) > 0:
+        #     for box in labels[:, 1:]:
+        #         x_min, y_min, box_w, box_h = box
+        #         cv2.rectangle(dst_img, (int(x_min), int(y_min)), (int(x_min + box_w), int(y_min + box_h)),
+        #                       (0, 0, 255), 1)
         # cv2.imshow('dst_img', dst_img)
         # cv2.waitKey(0)
+        # # cv2.imwrite("dst_img.jpg", dst_img)
 
-        image = torch.from_numpy(image).permute(2, 0, 1).contiguous() / 255
+        return image, img_info, labels
 
-        target = self.build_target(boxes, labels)
+    def build_target(self, labels: ndarray, img_info: List, img_id: Union[int, str]):
+        assert isinstance(labels, ndarray)
+        target = torch.zeros((self.max_det_nums, 5))
+        if len(labels) > 0:
+            # 将数值缩放到[0, 1]区间
+            labels[:, 1:] = labels[:, 1:] / self.target_size
+            # [x1, y1, w, h] -> [xc, yc, w, h]
+            labels[:, 1:] = label2yolobox(labels[:, 1:])
+
+            for i, label in enumerate(labels[:self.max_det_nums]):
+                target[i, :] = torch.from_numpy(label)
 
         if self.train:
-            return image, target
+            return target
         else:
-            image_name = os.path.splitext(os.path.basename(image_path))[0]
-            target = {
-                KEY_TARGET: target,
-                KEY_IMAGE_INFO: img_info,
-                KEY_IMAGE_ID: image_name
-            }
-            return image, target
-
-    def build_target(self, boxes, labels):
-        """
-        :param boxes: [[x1, y1, box_w, box_h], ...]
-        :param labels: [box1_cls_idx, ...]
-        :return:
-        """
-        if len(boxes) > 0:
-            # 将数值缩放到[0, 1]区间
-            boxes = boxes / self.target_size
-            # [x1, y1, w, h] -> [xc, yc, w, h]
-            boxes = label2yolobox(boxes)
-
-        target = torch.zeros((self.max_det_nums, 5))
-        for i, (box, label) in enumerate(zip(boxes[:self.max_det_nums], labels[:self.max_det_nums])):
-            target[i, :4] = torch.from_numpy(box)
-            target[i, 4] = label
-
+            image_name = os.path.splitext(os.path.basename(img_id))[0]
+            target = Target(target, img_info, image_name)
         return target
 
     def __add__(self, other: 'Dataset[T_co]') -> 'ConcatDataset[T_co]':

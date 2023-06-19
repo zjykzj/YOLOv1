@@ -6,7 +6,6 @@
 @author: zj
 @description: 
 """
-import copy
 from typing import Dict, List
 
 import cv2
@@ -14,24 +13,22 @@ import cv2
 from numpy import ndarray
 import numpy as np
 
-from yolo.util.box_utils import xyxy2xywh, xywh2xyxy
 
-
-def resize_and_pad(src_img, bboxes, dst_size, jitter_ratio=0.0, random_replacing=False):
+def pad_and_resize(src_img, labels, dst_size, jitter=0.0, random_replacing=False):
     """
     src_img: [H, W, 3]
-    bboxes: [K, 4] x1/y1/b_w/b_h
+    labels: [K, 5] cls_id/x1/y1/b_w/b_h
     """
     src_h, src_w = src_img.shape[:2]
 
-    dh = jitter_ratio * src_h
-    dw = jitter_ratio * src_w
+    dh = jitter * src_h
+    dw = jitter * src_w
     new_ratio = (src_w + np.random.uniform(low=-dw, high=dw)) / (src_h + np.random.uniform(low=-dh, high=dh))
     if new_ratio < 1:
         # 高大于宽
         # 设置目标大小为高，等比例缩放宽，剩余部分进行填充
         dst_h = dst_size
-        dst_w = new_ratio * dst_size
+        dst_w = dst_size * new_ratio
     else:
         # 宽大于等于高
         # 设置目标大小为宽，等比例缩放高，剩余部分进行填充
@@ -54,33 +51,30 @@ def resize_and_pad(src_img, bboxes, dst_size, jitter_ratio=0.0, random_replacing
     padded_img = np.ones((dst_size, dst_size, 3), dtype=np.uint8) * 127
     padded_img[dy:dy + dst_h, dx:dx + dst_w, :] = resized_img
 
-    if len(bboxes) > 0:
+    if len(labels) > 0:
         # 进行缩放以及填充后需要相应的修改坐标位置
-        # x_left_top
-        bboxes[:, 0] = bboxes[:, 0] / src_w * dst_w + dx
-        # y_left_top
-        bboxes[:, 1] = bboxes[:, 1] / src_h * dst_h + dy
+        labels[:, 1] = labels[:, 1] / src_w * dst_w + dx
+        labels[:, 2] = labels[:, 2] / src_h * dst_h + dy
         # 对于宽/高而言，仅需缩放对应比例即可，不需要增加填充坐标
-        # box_w
-        bboxes[:, 2] = bboxes[:, 2] / src_w * dst_w
-        # box_h
-        bboxes[:, 3] = bboxes[:, 3] / src_h * dst_h
+        labels[:, 3] = labels[:, 3] / src_w * dst_w
+        labels[:, 4] = labels[:, 4] / src_h * dst_h
 
     img_info = [src_h, src_w, dst_h, dst_w, dx, dy, dst_size]
-    return padded_img, bboxes, img_info
+    return padded_img, labels, img_info
 
 
-def left_right_flip(img, bboxes):
+def left_right_flip(img: ndarray, labels: ndarray):
     dst_img = cv2.flip(img, 1)
 
-    if len(bboxes) > 0:
+    if len(labels) > 0:
         h, w = img.shape[:2]
         # 左右翻转，所以宽/高不变，变换左上角坐标(x1, y1)和右上角坐标(x2, y1)进行替换
-        x2 = bboxes[:, 0] + bboxes[:, 2]
-        # y1/2/h不变，仅变换x1 = w - x2
-        bboxes[:, 0] = w - x2
+        # x2 = x1 + box_w
+        x2 = labels[:, 1] + labels[:, 3]
+        # y1/box_w/bo_h不变，仅变换x1 = w - x2
+        labels[:, 1] = w - x2
 
-    return dst_img, bboxes
+    return dst_img, labels
 
 
 def rand_scale(s):
@@ -98,7 +92,7 @@ def rand_scale(s):
     return 1 / scale
 
 
-def color_dithering(src_img, hue, saturation, exposure):
+def color_dithering(src_img: ndarray, hue: float, saturation: float, exposure: float):
     """
     src_img: 图像 [H, W, 3]
     hue: 色调
@@ -128,6 +122,11 @@ def color_dithering(src_img, hue, saturation, exposure):
     return img
 
 
+def bgr2rgb(img: ndarray):
+    # BGR -> RGB
+    return img[:, :, ::-1]
+
+
 def print_info(index, img, bboxes, bboxes_xxyy, img_size, img_info):
     print(f"index: {index}")
     print(f"img: {img.shape}")
@@ -141,56 +140,60 @@ def print_info(index, img, bboxes, bboxes_xxyy, img_size, img_info):
 class Transform(object):
 
     def __init__(self, cfg: Dict, is_train: bool = True):
-        # def __init__(self, is_train: bool = True):
         self.is_train = is_train
 
         # 空间抖动
-        self.jitter_ratio = cfg['AUGMENTATION']['JITTER']
-        # self.jitter_ratio = 0.3
+        self.jitter = cfg['AUGMENTATION']['JITTER']
+        assert self.jitter > 0
         # 随机放置
         self.random_placing = cfg['AUGMENTATION']['RANDOM_PLACING']
-        # self.random_placing = True
         # 左右翻转
-        self.is_flip = cfg['AUGMENTATION']['RANDOM_HORIZONTAL_FLIP']
-        # self.is_flip = True
+        self.is_flip = cfg['AUGMENTATION']['RANDOM_FLIP']
         # 颜色抖动
-        self.color_jitter = cfg['AUGMENTATION']['COLOR_DITHERING']
+        self.is_color = cfg['AUGMENTATION']['IS_COLOR']
         self.hue = cfg['AUGMENTATION']['HUE']
         self.saturation = cfg['AUGMENTATION']['SATURATION']
         self.exposure = cfg['AUGMENTATION']['EXPOSURE']
-        # self.color_jitter = True
-        # self.hue = 0.1
-        # self.saturation = 1.5
-        # self.exposure = 1.5
+        # 颜色空间转换
+        self.is_rgb = cfg['AUGMENTATION']['IS_RGB']
 
-    def __call__(self, index: int, img: ndarray, bboxes: List, img_size: int):
-        # BGR -> RGB
-        img = img[:, :, ::-1]
+    def __call__(self, index: int, img_size: int, img: ndarray, labels: ndarray):
+        return self.forward(index, img_size, img, labels)
+
+    def forward(self, index: int, img_size: int, img: ndarray, labels: ndarray):
+        assert len(img.shape) == 3 and img.shape[2] == 3
+        assert len(labels) == 0 or (len(labels.shape) == 2 or labels.shape[1] == 5)
+
         if self.is_train:
-            # 首先进行缩放+填充+空间抖动
-            img, bboxes, img_info = resize_and_pad(img, bboxes, img_size, self.jitter_ratio, self.random_placing)
-
-            # if len(bboxes) > 0:
-            #     bboxes_xxyy = xywh2xyxy(bboxes, is_center=False)
-            #     bboxes_xxyy = np.clip(bboxes_xxyy, 0., img_size - 0.0001)
-            #     assert np.all(bboxes_xxyy < img_size), print_info(index, img, bboxes, bboxes_xxyy, img_size, img_info)
-            #     bboxes = xyxy2xywh(bboxes_xxyy, is_center=False)
-
-            # 然后进行左右翻转
-            # img_info = []
-            if self.is_flip and np.random.randn() > 0.5:
-                img, bboxes = left_right_flip(img, bboxes)
-            # 最后进行颜色抖动
-            if self.color_jitter:
-                img = color_dithering(img, self.hue, self.saturation, self.exposure)
+            img, labels, img_info = self._get_train(index, img_size, img, labels)
         else:
-            # 进行缩放+填充，不执行空间抖动
-            img, bboxes, img_info = resize_and_pad(img, bboxes, img_size, jitter_ratio=0., random_replacing=False)
+            img, labels, img_info = self._get_val(index, img_size, img, labels)
+        return img, labels, img_info
 
-            # if len(bboxes) > 0:
-            #     bboxes_xxyy = xywh2xyxy(bboxes, is_center=False)
-            #     bboxes_xxyy = np.clip(bboxes_xxyy, 0., img_size - 0.0001)
-            #     assert np.all(bboxes_xxyy < img_size), print_info(index, img, bboxes, bboxes_xxyy, img_size, img_info)
-            #     bboxes = xyxy2xywh(bboxes_xxyy, is_center=False)
+    def _get_train(self, index: int, img_size: int, img: ndarray, labels: ndarray):
+        """
+        1. Pad+Resize
+        2. BGR2RGB
+        3. Horizontal Flip
+        4. Color Jitter
+        """
+        img, labels, img_info = pad_and_resize(img, labels, img_size, self.jitter, self.random_placing)
+        if self.is_rgb:
+            img = bgr2rgb(img)
+        if self.is_flip and np.random.randn() > 0.5:
+            img, labels = left_right_flip(img, labels)
+        if self.is_color:
+            img = color_dithering(img, self.hue, self.saturation, self.exposure)
 
-        return img, bboxes, img_info
+        return img, labels, img_info
+
+    def _get_val(self, index: int, img_size: int, img: ndarray, labels: ndarray):
+        """
+        1. Pad+Resize
+        2. BGR2RGB
+        """
+        img, labels, img_info = pad_and_resize(img, labels, img_size, jitter=0., random_replacing=False)
+        if self.is_rgb:
+            img = bgr2rgb(img)
+
+        return img, labels, img_info
