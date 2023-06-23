@@ -115,8 +115,8 @@ class YOLOv1Loss(nn.Module):
                 iou_mask[ni, ...] = 0
                 continue
 
-            gt_cls_ids = targets[ni][:num_obj][..., 4]
-            gt_boxes = targets[ni][:num_obj][..., :4]
+            gt_cls_ids = targets[ni][:num_obj][..., 0]
+            gt_boxes = targets[ni][:num_obj][..., 1:]
             gt_boxes[..., 0::2] *= W
             gt_boxes[..., 1::2] *= H
 
