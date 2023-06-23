@@ -147,9 +147,9 @@ class YOLOv1(nn.Module):
             self.model = yolo.YOLOv1(num_classes=1000, is_expand=False)
         elif 'fastyolov1' == arch.lower():
             self.model = yolo.FastYOLOv1(num_classes=1000, is_expand=False)
-        elif 'optimized_yolov1' == arch.lower():
+        elif 'yolov1_s14' == arch.lower():
             self.model = yolo.YOLOv1(num_classes=1000, is_expand=True)
-        elif 'optimized_fastyolov1' == arch.lower():
+        elif 'fastyolov1_s14' == arch.lower():
             self.model = yolo.FastYOLOv1(num_classes=1000, is_expand=True)
         else:
             raise ValueError(f"{arch} doesn't supports")

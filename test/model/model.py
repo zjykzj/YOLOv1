@@ -18,7 +18,7 @@ def test_fastyolov1():
     shape = (1, 3, 448, 448)
     S = 14
     stride = 32
-    arch = 'Optimized_FastYOLOv1'
+    arch = 'FastYOLOv1_S14'
     print(f"{arch} Input: {shape} S: {S} stride: {stride}")
     data = torch.randn(shape)
     model = YOLOv1(num_classes=20, S=S, B=2, stride=stride, arch=arch, pretrained=None)
@@ -49,7 +49,7 @@ def test_fastyolov1():
     shape = (1, 3, 224, 224)
     S = 7
     stride = 32
-    arch = 'Optimized_FastYOLOv1'
+    arch = 'FastYOLOv1_S14'
     print(f"{arch} Input: {shape} S: {S} stride: {stride}")
     data = torch.randn(shape)
     model = YOLOv1(num_classes=20, S=S, B=2, stride=stride, arch=arch, pretrained=None)
@@ -84,7 +84,7 @@ def test_yolov1():
     shape = (1, 3, 448, 448)
     S = 14
     stride = 32
-    arch = 'Optimized_YOLOv1'
+    arch = 'YOLOv1_S14'
     print(f"{arch} Input: {shape} S: {S} stride: {stride}")
     data = torch.randn(shape)
     model = YOLOv1(num_classes=20, S=S, B=2, stride=stride, arch=arch, pretrained=None)
@@ -115,7 +115,7 @@ def test_yolov1():
     shape = (1, 3, 224, 224)
     S = 7
     stride = 32
-    arch = 'Optimized_YOLOv1'
+    arch = 'YOLOv1_S14'
     print(f"{arch} Input: {shape} S: {S} stride: {stride}")
     data = torch.randn(shape)
     model = YOLOv1(num_classes=20, S=S, B=2, stride=stride, arch=arch, pretrained=None)

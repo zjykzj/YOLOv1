@@ -47,8 +47,8 @@ def parse():
                          and callable(models.__dict__[name]))
     model_names.append('yolov1')
     model_names.append('fastyolov1')
-    model_names.append('optimized_yolov1')
-    model_names.append('optimized_fastyolov1')
+    model_names.append('yolov1_s14')
+    model_names.append('fastyolov1_s14')
 
     parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
     parser.add_argument('data', metavar='DIR',
@@ -169,12 +169,12 @@ def main():
         print("=> creating model FastYOLOv1")
         from yolo import FastYOLOv1
         model = FastYOLOv1(num_classes=1000, is_expand=False)
-    elif args.arch.lower() == 'optimized_yolov1':
-        print("=> creating model Optimized_YOLOv1")
+    elif args.arch.lower() == 'yolov1_s14':
+        print("=> creating model YOLOv1_S14")
         from yolo import YOLOv1
         model = YOLOv1(num_classes=1000, is_expand=True)
-    elif args.arch.lower() == 'optimized_fastyolov1':
-        print("=> creating model Optimized_FastYOLOv1")
+    elif args.arch.lower() == 'fastyolov1_s14':
+        print("=> creating model FastYOLOv1_S14")
         from yolo import FastYOLOv1
         model = FastYOLOv1(num_classes=1000, is_expand=True)
     else:
