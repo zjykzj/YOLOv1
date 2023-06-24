@@ -19,7 +19,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 python -m torch.distributed.launch --nproc_per_node
 ```
 
 ```shell
-CUDA_VISIBLE_DEVICES=0,1 python -m torch.distributed.launch --nproc_per_node=2 --master_port "31226" main_amp.py --arch yolov1_s14 -b 256 --workers 4 --opt-level O1 --resume weights/yolov1_224_s14/model_best.pth.tar --evaluate ./imagenet/
+CUDA_VISIBLE_DEVICES=0,1 python -m torch.distributed.launch --nproc_per_node=2 --master_port "31226" main_amp.py --arch yolov1_s14 -b 256 --workers 4 --opt-level O1 --resume weights/yolov1_s14_224/model_best.pth.tar --evaluate ./imagenet/
  * Prec@1 73.828 Prec@5 91.314
 ```
 

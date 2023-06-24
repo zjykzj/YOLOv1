@@ -171,27 +171,51 @@ AP for train = 0.7625
 AP for tvmonitor = 0.7015
 Mean AP = 0.6721
 python eval.py -c configs/fastyolov1_s14_voc.cfg -ckpt outputs/fastyolov1_s14_voc/model_best.pth.tar ../datasets/voc
-AP for aeroplane = 0.5919
-AP for bicycle = 0.6932
-AP for bird = 0.4562
-AP for boat = 0.3990
-AP for bottle = 0.2225
-AP for bus = 0.6646
-AP for car = 0.6611
-AP for cat = 0.6661
-AP for chair = 0.3390
-AP for cow = 0.5466
-AP for diningtable = 0.5305
-AP for dog = 0.6118
-AP for horse = 0.7250
-AP for motorbike = 0.6989
-AP for person = 0.6050
-AP for pottedplant = 0.2408
-AP for sheep = 0.5266
-AP for sofa = 0.5623
-AP for train = 0.6839
-AP for tvmonitor = 0.5607
-Mean AP = 0.5493
+VOC07 metric? Yes
+AP for aeroplane = 0.6351
+AP for bicycle = 0.6876
+AP for bird = 0.4754
+AP for boat = 0.3916
+AP for bottle = 0.2111
+AP for bus = 0.6681
+AP for car = 0.6473
+AP for cat = 0.6638
+AP for chair = 0.3328
+AP for cow = 0.5368
+AP for diningtable = 0.5210
+AP for dog = 0.6372
+AP for horse = 0.7270
+AP for motorbike = 0.6959
+AP for person = 0.6057
+AP for pottedplant = 0.2159
+AP for sheep = 0.5438
+AP for sofa = 0.5415
+AP for train = 0.6783
+AP for tvmonitor = 0.5458
+Mean AP = 0.5481
+python eval.py -c configs/fastyolov1_voc.cfg -ckpt outputs/fastyolov1_voc/model_best.pth.tar ../datasets/voc
+VOC07 metric? Yes
+AP for aeroplane = 0.5922
+AP for bicycle = 0.6198
+AP for bird = 0.4091
+AP for boat = 0.3628
+AP for bottle = 0.1442
+AP for bus = 0.6122
+AP for car = 0.5751
+AP for cat = 0.6963
+AP for chair = 0.2481
+AP for cow = 0.4858
+AP for diningtable = 0.5206
+AP for dog = 0.6302
+AP for horse = 0.7140
+AP for motorbike = 0.6067
+AP for person = 0.5111
+AP for pottedplant = 0.1767
+AP for sheep = 0.4401
+AP for sofa = 0.5081
+AP for train = 0.6637
+AP for tvmonitor = 0.4619
+Mean AP = 0.4989
 ```
 
 ### Demo
