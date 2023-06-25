@@ -69,7 +69,7 @@ def image_preprocess(args: Namespace, cfg: Dict):
         img = cv2.imread(args.image)
         img_raw = img.copy()
 
-        img, _, img_info = transform(0, img, np.array([]), imgsize)
+        img, _, img_info = transform(0, imgsize, img, np.array([]))
         # [H, W, C] -> [C, H, W]
         img = torch.from_numpy(img).permute(2, 0, 1).contiguous() / 255
         print("img:", img.shape)
@@ -85,7 +85,7 @@ def image_preprocess(args: Namespace, cfg: Dict):
             img = cv2.imread(img_path)
             img_raw = img.copy()
 
-            img, _, img_info = transform(i, img, np.array([]), imgsize)
+            img, _, img_info = transform(i, imgsize, img, np.array([]))
             # [H, W, C] -> [C, H, W]
             img = torch.from_numpy(img).permute(2, 0, 1).contiguous() / 255
             print("img:", img.shape)
