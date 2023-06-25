@@ -151,7 +151,7 @@ def process(input_data: Tensor, model: Module, device: torch.device,
             conf_thre=0.5, nms_thre=0.45, num_classes=20):
     # img: [1, 3, 416, 416]
     # 执行模型推理，批量计算每幅图像的预测框坐标以及对应的目标置信度+分类概率
-    outputs = model(input_data.unsqueeze(0).to(device)).cpu()
+    outputs = model(input_data.unsqueeze(0).to(dtype=torch.float, device=device)).cpu()
     # outputs: [B, N_bbox, 4(xywh)+1(conf)+num_classes]
     # 图像后处理，执行预测边界框的坐标转换以及置信度阈值过滤+NMS IoU阈值过滤
     outputs = postprocess(outputs, num_classes, conf_thre=conf_thre, nms_thre=nms_thre)
