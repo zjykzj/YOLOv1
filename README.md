@@ -89,6 +89,7 @@
 
 ## Latest News
 
+* ***[2023/06/26][v0.3.2](https://github.com/zjykzj/YOLOv1/releases/tag/v0.3.2). Refactor data module.***
 * ***[2023/05/16][v0.3.1](https://github.com/zjykzj/YOLOv1/releases/tag/v0.3.1). Add `IGNORE_THRESH` in YOLOv1Loss and reset `lambda_*` based on the YOLOv1 paper.***
   * **In this version, the test results on the VOC dataset have exceeded the paper implementation.**
 * ***[2023/05/16][v0.3.0](https://github.com/zjykzj/YOLOv1/releases/tag/v0.3.0). Expand receptive field and use F.cross_entropy for class loss.***
