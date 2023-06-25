@@ -71,7 +71,7 @@ def image_preprocess(args: Namespace, cfg: Dict):
 
         img, _, img_info = transform(0, imgsize, img, np.array([]))
         # [H, W, C] -> [C, H, W]
-        img = torch.from_numpy(img).permute(2, 0, 1).contiguous() / 255
+        img = torch.from_numpy(img.astype(float)).permute(2, 0, 1).contiguous() / 255
         print("img:", img.shape)
 
         img_list.append(img)
@@ -87,7 +87,7 @@ def image_preprocess(args: Namespace, cfg: Dict):
 
             img, _, img_info = transform(i, imgsize, img, np.array([]))
             # [H, W, C] -> [C, H, W]
-            img = torch.from_numpy(img).permute(2, 0, 1).contiguous() / 255
+            img = torch.from_numpy(img.astype(float)).permute(2, 0, 1).contiguous() / 255
             print("img:", img.shape)
 
             img_list.append(img)
