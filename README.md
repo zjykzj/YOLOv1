@@ -15,7 +15,7 @@
   <a href="http://commitizen.github.io/cz-cli/"><img src="https://img.shields.io/badge/commitizen-friendly-brightgreen.svg" alt=""></a>
 </p>
 
-* Train using the `VOC07+12 trainval` dataset and test using the `VOC2007 Test` dataset with an input size of `416x416`. give the result as follows
+* Train using the `VOC07+12 trainval` dataset and test using the `VOC2007 Test` dataset with an input size of `448x448`. give the result as follows
 
 <!-- <style type="text/css">
 .tg  {border-collapse:collapse;border-spacing:0;}
@@ -60,10 +60,10 @@
     <td class="tg-zkss">63.4</td>
     <td class="tg-9y4h">52.7</td>
     <td class="tg-9y4h">66.5</td>
-    <td class="tg-baqh">67.21</td>
-    <td class="tg-baqh">54.93</td>
-    <td class="tg-baqh">62.55</td>
-    <td class="tg-baqh">50.46</td>
+    <td class="tg-baqh">66.06</td>
+    <td class="tg-baqh">54.81</td>
+    <td class="tg-baqh">63.06</td>
+    <td class="tg-baqh">49.89</td>
   </tr>
 </tbody>
 </table>
@@ -149,27 +149,51 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 python -m torch.distributed.launch --nproc_per_node
 
 ```shell
 python eval.py -c configs/yolov1_s14_voc.cfg -ckpt outputs/yolov1_s14_voc/model_best.pth.tar ../datasets/voc
-AP for aeroplane = 0.7092                                                                                                                                                                                          
-AP for bicycle = 0.7833                                                                                                                                                                                            
-AP for bird = 0.6309                                                                                                                                                                                               
-AP for boat = 0.5643                                                                                                                                                                                               
-AP for bottle = 0.3957                                                                                                                                                                                             
-AP for bus = 0.7446
-AP for car = 0.7476
-AP for cat = 0.8077
-AP for chair = 0.4976
-AP for cow = 0.7032
-AP for diningtable = 0.6630
-AP for dog = 0.7740
-AP for horse = 0.8174
-AP for motorbike = 0.7517
-AP for person = 0.6961
-AP for pottedplant = 0.3768
-AP for sheep = 0.6313
-AP for sofa = 0.6840
-AP for train = 0.7625
-AP for tvmonitor = 0.7015
-Mean AP = 0.6721
+VOC07 metric? Yes
+AP for aeroplane = 0.6778
+AP for bicycle = 0.7818
+AP for bird = 0.6459
+AP for boat = 0.5422
+AP for bottle = 0.3457
+AP for bus = 0.7388
+AP for car = 0.7438
+AP for cat = 0.8009
+AP for chair = 0.4762
+AP for cow = 0.6693
+AP for diningtable = 0.6399
+AP for dog = 0.7767
+AP for horse = 0.8256
+AP for motorbike = 0.7572
+AP for person = 0.6953
+AP for pottedplant = 0.3835
+AP for sheep = 0.6109
+AP for sofa = 0.6699
+AP for train = 0.7631
+AP for tvmonitor = 0.6684
+Mean AP = 0.6606
+python eval.py -c configs/yolov1_voc.cfg -ckpt outputs/yolov1_voc/model_best.pth.tar ../datasets/voc
+VOC07 metric? Yes
+AP for aeroplane = 0.6621
+AP for bicycle = 0.7497
+AP for bird = 0.6207
+AP for boat = 0.5305
+AP for bottle = 0.2737
+AP for bus = 0.7349
+AP for car = 0.6867
+AP for cat = 0.8092
+AP for chair = 0.4193
+AP for cow = 0.6807
+AP for diningtable = 0.6257
+AP for dog = 0.7545
+AP for horse = 0.7848
+AP for motorbike = 0.7172
+AP for person = 0.6324
+AP for pottedplant = 0.3107
+AP for sheep = 0.6070
+AP for sofa = 0.6538
+AP for train = 0.7643
+AP for tvmonitor = 0.5951
+Mean AP = 0.6306
 python eval.py -c configs/fastyolov1_s14_voc.cfg -ckpt outputs/fastyolov1_s14_voc/model_best.pth.tar ../datasets/voc
 VOC07 metric? Yes
 AP for aeroplane = 0.6351
