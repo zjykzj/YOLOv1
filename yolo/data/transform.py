@@ -349,7 +349,7 @@ class Transform(object):
                     labels[:, 1] = 1 - labels[:, 1]
 
         if self.is_rgb:
-            image = image[::-1]
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
         image = np.ascontiguousarray(image)
         return image, labels, shapes
