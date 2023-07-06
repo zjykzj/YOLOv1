@@ -6,11 +6,10 @@
 @author: zj
 @description: 
 """
-from typing import Optional, List, Union
+from typing import List, Union
 import os
 import cv2
 import glob
-import copy
 import random
 
 import numpy as np
@@ -19,10 +18,9 @@ from numpy import ndarray
 import torch
 from torch.utils.data.dataset import T_co
 
-from basedataset import BaseDataset
+from .basedataset import BaseDataset
 from ..transform import Transform
 from ..target import Target
-from yolo.util.box_utils import label2yolobox
 
 
 class VOCDataset(BaseDataset):
@@ -55,6 +53,7 @@ class VOCDataset(BaseDataset):
         assert len(self.image_path_list) == len(self.label_path_list)
 
         self.num_classes = len(self.classes)
+        self.indices = range(len(self.image_path_list))
 
     def __getitem__(self, index) -> T_co:
         if self.transform.is_mosaic:
@@ -65,12 +64,46 @@ class VOCDataset(BaseDataset):
 
         image_list = []
         label_list = []
+        img_path = None
         for idx in indices:
             image, labels, img_path = self._load_image_label(idx)
             image_list.append(image)
             label_list.append(labels)
 
+        #     from yolo.util.plots import visualize
+        #     from matplotlib.pylab import plt
+        #     bboxes = []
+        #     category_ids = []
+        #     h, w = image.shape[:2]
+        #     for label in labels:
+        #         x_c, y_c, box_w, box_h = label[1:]
+        #         x_min = (x_c - box_w / 2) * w
+        #         y_min = (y_c - box_h / 2) * h
+        #         box_w = box_w * w
+        #         box_h = box_h * h
+        #         bboxes.append([x_min, y_min, box_w, box_h])
+        #         category_ids.append(int(label[0]))
+        #     visualize(image, bboxes, category_ids, VOCDataset.classes)
+        # plt.show()
+
         image, labels, shapes = self.transform(image_list, label_list, self.target_size)
+
+        # h, w = image.shape[:2]
+        # print("after:", image.shape)
+        # bboxes = []
+        # category_ids = []
+        # if len(labels) > 0:
+        #     for label in labels:
+        #         x_c, y_c, box_w, box_h = label[1:]
+        #         x_min = (x_c - box_w / 2) * w
+        #         y_min = (y_c - box_h / 2) * h
+        #         box_w = box_w * w
+        #         box_h = box_h * h
+        #         bboxes.append([x_min, y_min, box_w, box_h])
+        #         category_ids.append(int(label[0]))
+        #
+        # visualize(image, bboxes, category_ids, VOCDataset.classes)
+        # plt.show()
 
         target = self._build_target(labels, shapes, img_path)
         return image, target
@@ -86,6 +119,8 @@ class VOCDataset(BaseDataset):
         # [[cls_id, x_center, y_center, box_w, box_h], ]
         # The coordinate size is relative to the width and height of the image
         labels = np.loadtxt(label_path, delimiter=' ', dtype=float)
+        if len(labels.shape) == 1:
+            labels = labels.reshape((1, 5))
         return image, labels, img_path
 
     def _build_target(self, labels: ndarray, img_info: List, img_id: Union[int, str]):
