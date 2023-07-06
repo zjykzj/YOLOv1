@@ -30,7 +30,6 @@ def setup_logging(local_rank, output_dir=None):
     _FORMAT = "[%(levelname)s: %(filename)s: %(lineno)4d]: %(message)s"
 
     if local_rank == 0:
-        # if du.is_master_proc():
         # Enable logging for the master process.
         logging.root.handlers = []
     else:
@@ -38,20 +37,22 @@ def setup_logging(local_rank, output_dir=None):
         _suppress_print()
         return EmptyLogger('ignore')
 
+    level = logging.INFO if local_rank == 0 else logging.ERROR
+
     logger = logging.getLogger()
-    logger.setLevel(logging.DEBUG)
+    # logger.setLevel(logging.DEBUG)
+    logger.setLevel(level)
     logger.propagate = False
     plain_formatter = logging.Formatter(
         "[%(asctime)s][%(levelname)s] %(filename)s: %(lineno)3d: %(message)s",
         datefmt="%m/%d %H:%M:%S",
     )
 
-    if local_rank == 0:
-        # if du.is_master_proc():
-        ch = logging.StreamHandler(stream=sys.stdout)
-        ch.setLevel(logging.DEBUG)
-        ch.setFormatter(plain_formatter)
-        logger.addHandler(ch)
+    ch = logging.StreamHandler(stream=sys.stdout)
+    # ch.setLevel(logging.DEBUG)
+    ch.setLevel(level)
+    ch.setFormatter(plain_formatter)
+    logger.addHandler(ch)
 
     # if output_dir is not None and du.is_master_proc():
     if output_dir is not None and local_rank == 0:
@@ -59,7 +60,8 @@ def setup_logging(local_rank, output_dir=None):
             os.makedirs(output_dir)
         filename = os.path.join(output_dir, "stdout.log")
         fh = logging.FileHandler(filename)
-        fh.setLevel(logging.DEBUG)
+        # fh.setLevel(logging.DEBUG)
+        fh.setLevel(level)
         fh.setFormatter(plain_formatter)
         logger.addHandler(fh)
 
