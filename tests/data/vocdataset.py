@@ -117,10 +117,34 @@ def test_val(cfg_file, name):
     end = time.time()
     for i in range(len(val_dataset)):
         image, target = val_dataset.__getitem__(i)
-        image = torch.from_numpy(image)
         assert isinstance(target, Target)
-        print(i, image.shape, target.target.shape, len(target.img_info), target.img_id)
 
+        # import matplotlib.pylab as plt
+        # from yolo.util.plots import visualize
+        #
+        # h, w = image.shape[:2]
+        # print("after:", image.shape)
+        # bboxes = []
+        # category_ids = []
+        #
+        # labels = target.target.clone()
+        # # [num_max_det, 5] -> [num_max_det]
+        # num_labels = (labels.sum(dim=1) > 0).sum()
+        # if num_labels > 0:
+        #     for label in labels[:num_labels].tolist():
+        #         x_c, y_c, box_w, box_h = label[1:]
+        #         x_min = (x_c - box_w / 2) * w
+        #         y_min = (y_c - box_h / 2) * h
+        #         box_w = box_w * w
+        #         box_h = box_h * h
+        #         bboxes.append([x_min, y_min, box_w, box_h])
+        #         category_ids.append(int(label[0]))
+        #
+        # visualize(image, bboxes, category_ids, VOCDataset.classes)
+        # plt.show()
+
+        image = torch.from_numpy(image)
+        print(i, image.shape, target.target.shape, len(target.img_info), target.img_id)
         images = image.unsqueeze(0)
         targets = target.target.unsqueeze(0)
         assert_data(images, targets)
@@ -132,9 +156,9 @@ if __name__ == '__main__':
 
     cfg_file = 'tests/data/voc.cfg'
 
-    # print("=> Pascal VOC Train")
-    # name = 'voc2yolov5-train'
-    # test_train(cfg_file, name)
+    print("=> Pascal VOC Train")
+    name = 'voc2yolov5-train'
+    test_train(cfg_file, name)
     print("=> Pascal VOC Val")
     name = 'voc2yolov5-val'
     test_val(cfg_file, name)

@@ -85,6 +85,9 @@ class VOCDataset(BaseDataset):
         #         category_ids.append(int(label[0]))
         #     visualize(image, bboxes, category_ids, VOCDataset.classes)
         # plt.show()
+        # if not self.train:
+        #     old_image = image_list[0].copy()
+        #     old_labels = label_list[0].copy()
 
         image, labels, shapes = self.transform(image_list, label_list, self.target_size)
 
@@ -101,6 +104,16 @@ class VOCDataset(BaseDataset):
         #         box_h = box_h * h
         #         bboxes.append([x_min, y_min, box_w, box_h])
         #         category_ids.append(int(label[0]))
+        # if shapes is not None and len(labels) > 0:
+        #     from yolo.util.box_utils import yolobox2label, xywhn2xyxy
+        #
+        #     old_labels[:, 1:] = xywhn2xyxy(old_labels[:, 1:], w=old_image.shape[1], h=old_image.shape[0])
+        #     new_labels = labels.copy()
+        #     new_labels[:, 1:] = xywhn2xyxy(labels[:, 1:], w=image.shape[1], h=image.shape[0])
+        #     for old_label, new_label in zip(old_labels, new_labels):
+        #         x1, y1, x2, y2 = new_label[1:]
+        #         y1, x1, y2, x2 = yolobox2label([y1, x1, y2, x2], shapes[:6])
+        #         assert np.allclose(old_label[1:], [x1, y1, x2, y2])
         #
         # visualize(image, bboxes, category_ids, VOCDataset.classes)
         # plt.show()
