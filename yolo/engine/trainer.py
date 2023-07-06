@@ -58,7 +58,7 @@ def train(args: Namespace,
     model.train()
     end = time.time()
 
-    random_resize = cfg['AUGMENTATION']['RANDOM_RESIZE']
+    random_resize = cfg['AUGMENT']['RANDOM_RESIZE']
     if random_resize:
         assert hasattr(train_loader.dataset, 'set_img_size')
         assert hasattr(train_loader.dataset, 'get_img_size')
