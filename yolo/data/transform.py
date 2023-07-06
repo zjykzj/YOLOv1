@@ -310,7 +310,8 @@ class Transform(object):
             # Letterbox
             shape = target_size  # final letterboxed shape
             image, ratio, pad = letterbox(image, shape, auto=False, scaleup=self.is_train)
-            shapes = (h0, w0), ((h / h0, w / w0), pad)  # for COCO mAP rescaling
+            # shapes = (h0, w0), ((h / h0, w / w0), pad)  # for COCO mAP rescaling
+            shapes = (h0, w0, h, w, pad[0], pad[1], target_size)  # for COCO mAP rescaling
 
             if labels.size:  # normalized xywh to pixel xyxy format
                 labels[:, 1:] = xywhn2xyxy(labels[:, 1:], ratio[0] * w, ratio[1] * h, padw=pad[0], padh=pad[1])
