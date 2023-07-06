@@ -6,9 +6,16 @@
 @author: zj
 @description: 
 """
+import os
 
+from typing import List, Union
+from numpy import ndarray
+
+import torch
 from torch.utils.data import Dataset
 from torch.utils.data.dataset import T_co
+
+from ..target import Target
 
 
 class BaseDataset(Dataset):
@@ -27,3 +34,17 @@ class BaseDataset(Dataset):
 
     def get_img_size(self):
         return self.target_size
+
+    def _build_target(self, labels: ndarray, img_info: List, img_id: Union[int, str]):
+        assert isinstance(labels, ndarray)
+        target = torch.zeros((self.max_det_nums, 5))
+        if len(labels) > 0:
+            for i, label in enumerate(labels[:self.max_det_nums]):
+                target[i, :] = torch.from_numpy(label)
+
+        if self.train:
+            return target
+        else:
+            image_name = os.path.splitext(os.path.basename(img_id))[0]
+            target = Target(target, img_info, image_name)
+        return target

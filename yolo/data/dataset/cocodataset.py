@@ -6,20 +6,17 @@
 @author: zj
 @description: 
 """
-from typing import Optional, List, Union
 import cv2
+import random
 import os.path
 
 import numpy as np
-from numpy import ndarray
 from pycocotools.coco import COCO
 
-import torch
-from torch.utils.data import Dataset
+from torch.utils.data.dataset import T_co
 
+from .basedataset import BaseDataset
 from ..transform import Transform
-from yolo.util.box_utils import label2yolobox
-from ..target import Target
 
 
 def get_coco_label_names():
@@ -56,7 +53,7 @@ def get_coco_label_names():
     return coco_label_names, coco_class_ids, coco_cls_colors
 
 
-class COCODataset(Dataset):
+class COCODataset(BaseDataset):
     classes = ['person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat', 'traffic light',
                'fire hydrant', 'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep', 'cow',
                'elephant', 'bear', 'zebra', 'giraffe', 'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee',
@@ -72,7 +69,6 @@ class COCODataset(Dataset):
                  name: str = 'val2017',
                  train: bool = True,
                  transform: Transform = None,
-                 target_transform: Transform = None,
                  target_size: int = 416,
                  max_det_nums=50,
                  min_size: int = 1,
@@ -81,8 +77,8 @@ class COCODataset(Dataset):
         self.root = root
         self.name = name
         self.train = train
+        assert transform is not None
         self.transform = transform
-        self.target_transform = target_transform
         self.target_size = target_size
         # 单张图片预设的最大真值边界框数目
         self.max_det_nums = max_det_nums
@@ -98,88 +94,100 @@ class COCODataset(Dataset):
         annotation_file = os.path.join(self.root, 'annotations', json_file)
         self.coco = COCO(annotation_file)
 
-        # 获取图片ID列表
         self.ids = self.coco.getImgIds()
-        # 获取类别ID
         self.class_ids = sorted(self.coco.getCatIds())
+        self.indices = range(len(self.ids))
 
-    def __getitem__(self, index):
-        # 获取ID
-        img_id = self.ids[index]
-        # 获取图像路径
-        img_file = os.path.join(self.root, 'images', self.name, '{:012}'.format(img_id) + '.jpg')
-        # 获取标注框信息
-        anno_ids = self.coco.getAnnIds(imgIds=[int(img_id)], iscrowd=None)
-        annotations = self.coco.loadAnns(anno_ids)
-
-        labels = []
-        for anno in annotations:
-            if anno['bbox'][2] > self.min_size and anno['bbox'][3] > self.min_size:
-                label = self.class_ids.index(anno['category_id'])
-                # bbox: [x1, y1, w, h]
-                bbox = anno['bbox']
-
-                labels.append([label, *bbox])
-        labels = np.array(labels)
-
-        image, img_info, labels = self.build_image(index, img_file, labels)
-        target = self.build_target(labels, img_info, img_id)
-        return image, target
-
-    def build_image(self, index: int, img_file: str, labels: ndarray):
-        # 读取图像
-        image = cv2.imread(img_file)
-
-        # import copy
-        # src_img = copy.deepcopy(image)
-        # if len(labels) > 0:
-        #     for box in labels[:, 1:]:
-        #         x_min, y_min, box_w, box_h = box
-        #         cv2.rectangle(src_img, (int(x_min), int(y_min)), (int(x_min + box_w), int(y_min + box_h)),
-        #                       (0, 0, 255), 1)
-        # cv2.imshow('src_img', src_img)
-        # # cv2.imwrite('src_img.jpg', src_img)
-
-        img_info = None
-        if self.transform is not None:
-            image, labels, img_info = self.transform(index, self.target_size, image, labels)
-
-        # dst_img = copy.deepcopy(image).astype(np.uint8)
-        # dst_img = cv2.cvtColor(dst_img, cv2.COLOR_RGB2BGR)
-        # if len(labels) > 0:
-        #     for box in labels[:, 1:]:
-        #         x_min, y_min, box_w, box_h = box
-        #         cv2.rectangle(dst_img, (int(x_min), int(y_min)), (int(x_min + box_w), int(y_min + box_h)),
-        #                       (0, 0, 255), 1)
-        # cv2.imshow('dst_img', dst_img)
-        # cv2.waitKey(0)
-        # # cv2.imwrite("dst_img.jpg", dst_img)
-
-        return image, img_info, labels
-
-    def build_target(self, labels: ndarray, img_info: List, img_id: Union[int, str]):
-        assert isinstance(labels, ndarray)
-        target = torch.zeros((self.max_det_nums, 5))
-        if len(labels) > 0:
-            # 将数值缩放到[0, 1]区间
-            labels[:, 1:] = labels[:, 1:] / self.target_size
-            # [x1, y1, w, h] -> [xc, yc, w, h]
-            labels[:, 1:] = label2yolobox(labels[:, 1:])
-
-            for i, label in enumerate(labels[:self.max_det_nums]):
-                target[i, :] = torch.from_numpy(label)
-
-        if self.train:
-            return target
+    def __getitem__(self, index) -> T_co:
+        if self.transform.is_mosaic:
+            indices = [index] + random.choices(self.indices, k=3)  # 3 additional image indices
+            random.shuffle(indices)
         else:
-            target = Target(target, img_info, img_id)
-        return target
+            indices = [index]
+
+        image_list = []
+        label_list = []
+        img_path = None
+        for idx in indices:
+            image, labels, img_path = self._load_image_label(idx)
+            image_list.append(image)
+            label_list.append(labels)
+
+        #     from yolo.util.plots import visualize
+        #     from matplotlib.pylab import plt
+        #     bboxes = []
+        #     category_ids = []
+        #     h, w = image.shape[:2]
+        #     for label in labels:
+        #         x_c, y_c, box_w, box_h = label[1:]
+        #         x_min = (x_c - box_w / 2) * w
+        #         y_min = (y_c - box_h / 2) * h
+        #         box_w = box_w * w
+        #         box_h = box_h * h
+        #         bboxes.append([x_min, y_min, box_w, box_h])
+        #         category_ids.append(int(label[0]))
+        #     visualize(image, bboxes, category_ids, COCODataset.classes)
+        # plt.show()
+        # if not self.train:
+        #     old_image = image_list[0].copy()
+        #     old_labels = label_list[0].copy()
+
+        image, labels, shapes = self.transform(image_list, label_list, self.target_size)
+
+        # h, w = image.shape[:2]
+        # print("after:", image.shape)
+        # bboxes = []
+        # category_ids = []
+        # if len(labels) > 0:
+        #     for label in labels:
+        #         x_c, y_c, box_w, box_h = label[1:]
+        #         x_min = (x_c - box_w / 2) * w
+        #         y_min = (y_c - box_h / 2) * h
+        #         box_w = box_w * w
+        #         box_h = box_h * h
+        #         bboxes.append([x_min, y_min, box_w, box_h])
+        #         category_ids.append(int(label[0]))
+        # if shapes is not None and len(labels) > 0:
+        #     from yolo.util.box_utils import yolobox2label, xywhn2xyxy
+        #
+        #     old_labels[:, 1:] = xywhn2xyxy(old_labels[:, 1:], w=old_image.shape[1], h=old_image.shape[0])
+        #     new_labels = labels.copy()
+        #     new_labels[:, 1:] = xywhn2xyxy(labels[:, 1:], w=image.shape[1], h=image.shape[0])
+        #     for old_label, new_label in zip(old_labels, new_labels):
+        #         x1, y1, x2, y2 = new_label[1:]
+        #         y1, x1, y2, x2 = yolobox2label([y1, x1, y2, x2], shapes[:6])
+        #         assert np.allclose(old_label[1:], [x1, y1, x2, y2])
+        #
+        # visualize(image, bboxes, category_ids, COCODataset.classes)
+        # plt.show()
+
+        target = self._build_target(labels, shapes, img_path)
+        return image, target
 
     def __len__(self):
         return len(self.ids)
 
-    def set_img_size(self, img_size):
-        self.target_size = img_size
+    def _load_image_label(self, index):
+        # Image
+        img_id = self.ids[index]
+        img_path = os.path.join(self.root, 'images', self.name, '{:012}'.format(img_id) + '.jpg')
+        image = cv2.imread(img_path)
+        h, w = image.shape[:2]
 
-    def get_img_size(self):
-        return self.target_size
+        # BBoxes
+        anno_ids = self.coco.getAnnIds(imgIds=[int(img_id)], iscrowd=None)
+        annotations = self.coco.loadAnns(anno_ids)
+        labels = []
+        for anno in annotations:
+            if anno['bbox'][2] > self.min_size and anno['bbox'][3] > self.min_size:
+                label = self.class_ids.index(anno['category_id'])
+                x_min, y_min, box_w, box_h = anno['bbox']
+                x_center = (x_min + box_w / 2.) / w
+                y_center = (y_min + box_h / 2.) / h
+                box_w = box_w / w
+                box_h = box_h / h
+
+                labels.append([label, x_center, y_center, box_w, box_h])
+        labels = np.array(labels)
+
+        return image, labels, img_path
