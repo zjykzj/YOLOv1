@@ -206,7 +206,7 @@ def do_mosaic(image_list, label_list, target_size, mosaic_border):
         labels = labels.copy()
         if labels.size:
             labels[:, 1:] = xywhn2xyxy(labels[:, 1:], w, h, padw, padh)  # normalized xywh to pixel xyxy format
-        labels4.append(labels)
+            labels4.append(labels)
 
     # Concat/clip labels
     labels4 = np.concatenate(labels4, 0)
