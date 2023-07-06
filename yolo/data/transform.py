@@ -271,6 +271,8 @@ class Transform(object):
         self.hue = cfg_augment['HUE']
         self.saturation = cfg_augment['SATURATION']
         self.exposure = cfg_augment['EXPOSURE']
+        # RGB
+        self.is_rgb = cfg_augment['RGB']
 
         if self.is_train:
             img_size = cfg['TRAIN']['IMGSIZE']
@@ -281,7 +283,7 @@ class Transform(object):
 
     def forward(self, image_list: List[ndarray], label_list: List[ndarray], target_size: int):
         """
-        image: HWC
+        image: HWC, BGR
         label: [cls_id, xc, yc, w, h] normalized
 
         1. Image Resize
@@ -346,4 +348,8 @@ class Transform(object):
                 if nl:
                     labels[:, 1] = 1 - labels[:, 1]
 
+        if self.is_rgb:
+            image = image[::-1]
+
+        image = np.ascontiguousarray(image)
         return image, labels, shapes
