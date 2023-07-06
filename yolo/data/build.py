@@ -50,7 +50,6 @@ def build_data(cfg: Dict, data_root: str, is_train: bool = False, is_distributed
                              name=dataset_name,
                              train=is_train,
                              transform=transform,
-                             target_transform=None,
                              target_size=img_size,
                              max_det_nums=max_det_num
                              )
@@ -64,7 +63,6 @@ def build_data(cfg: Dict, data_root: str, is_train: bool = False, is_distributed
                               name=dataset_name,
                               train=is_train,
                               transform=transform,
-                              target_transform=None,
                               target_size=img_size,
                               max_det_nums=max_det_num
                               )
