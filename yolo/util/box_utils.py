@@ -51,7 +51,7 @@ def xyxy2xywhn(x, w=640, h=640, clip=False, eps=0.0):
 
 def xywh2xyxy(boxes, is_center=False):
     assert len(boxes.shape) >= 2 and boxes.shape[-1] == 4
-    boxes_xxyy = torch.zeros(boxes.shape)
+    boxes_xxyy = boxes.new_zeros(boxes.shape) if isinstance(boxes, Tensor) else copy.deepcopy(boxes)
     if is_center:
         # [x_c, y_c, w, h] -> [x1, y1, x2, y2]
         boxes_xxyy[..., 0] = (boxes[..., 0] - boxes[..., 2] / 2)
@@ -67,7 +67,7 @@ def xywh2xyxy(boxes, is_center=False):
 
 def xyxy2xywh(boxes, is_center=False):
     assert len(boxes.shape) == 2 and boxes.shape[1] == 4
-    boxes_xywh = copy.deepcopy(boxes)
+    boxes_xywh = boxes.new_zeros(boxes.shape) if isinstance(boxes, Tensor) else copy.deepcopy(boxes)
     if is_center:
         # [x1, y1, x2, y2] -> [x_c, y_c, w, h]
         boxes_xywh[:, 0] = (boxes[:, 0] + boxes[:, 2]) / 2
