@@ -62,8 +62,8 @@
     <td class="tg-9y4h">66.5</td>
     <td class="tg-baqh">66.06</td>
     <td class="tg-baqh">54.81</td>
-    <td class="tg-baqh">63.06</td>
-    <td class="tg-baqh">49.89</td>
+    <td class="tg-baqh">66.85</td>
+    <td class="tg-baqh">52.89</td>
   </tr>
 </tbody>
 </table>
@@ -174,27 +174,27 @@ AP for tvmonitor = 0.6684
 Mean AP = 0.6606
 python eval.py -c configs/yolov1_voc.cfg -ckpt outputs/yolov1_voc/model_best.pth.tar ../datasets/voc
 VOC07 metric? Yes
-AP for aeroplane = 0.6621
-AP for bicycle = 0.7497
-AP for bird = 0.6207
-AP for boat = 0.5305
-AP for bottle = 0.2737
-AP for bus = 0.7349
-AP for car = 0.6867
-AP for cat = 0.8092
-AP for chair = 0.4193
-AP for cow = 0.6807
-AP for diningtable = 0.6257
-AP for dog = 0.7545
-AP for horse = 0.7848
-AP for motorbike = 0.7172
-AP for person = 0.6324
-AP for pottedplant = 0.3107
-AP for sheep = 0.6070
-AP for sofa = 0.6538
-AP for train = 0.7643
-AP for tvmonitor = 0.5951
-Mean AP = 0.6306
+AP for aeroplane = 0.6916
+AP for bicycle = 0.7539
+AP for bird = 0.6359
+AP for boat = 0.5363
+AP for bottle = 0.3216
+AP for bus = 0.7710
+AP for car = 0.7297
+AP for cat = 0.8380
+AP for chair = 0.4568
+AP for cow = 0.7125
+AP for diningtable = 0.6579
+AP for dog = 0.7984
+AP for horse = 0.7886
+AP for motorbike = 0.7398
+AP for person = 0.6630
+AP for pottedplant = 0.4048
+AP for sheep = 0.6586
+AP for sofa = 0.6916
+AP for train = 0.8208
+AP for tvmonitor = 0.6996
+Mean AP = 0.6685
 python eval.py -c configs/fastyolov1_s14_voc.cfg -ckpt outputs/fastyolov1_s14_voc/model_best.pth.tar ../datasets/voc
 VOC07 metric? Yes
 AP for aeroplane = 0.6351
@@ -220,27 +220,27 @@ AP for tvmonitor = 0.5458
 Mean AP = 0.5481
 python eval.py -c configs/fastyolov1_voc.cfg -ckpt outputs/fastyolov1_voc/model_best.pth.tar ../datasets/voc
 VOC07 metric? Yes
-AP for aeroplane = 0.5922
-AP for bicycle = 0.6198
-AP for bird = 0.4091
-AP for boat = 0.3628
-AP for bottle = 0.1442
-AP for bus = 0.6122
-AP for car = 0.5751
-AP for cat = 0.6963
-AP for chair = 0.2481
-AP for cow = 0.4858
-AP for diningtable = 0.5206
-AP for dog = 0.6302
-AP for horse = 0.7140
-AP for motorbike = 0.6067
-AP for person = 0.5111
-AP for pottedplant = 0.1767
-AP for sheep = 0.4401
-AP for sofa = 0.5081
-AP for train = 0.6637
-AP for tvmonitor = 0.4619
-Mean AP = 0.4989
+AP for aeroplane = 0.5515
+AP for bicycle = 0.6446
+AP for bird = 0.4649
+AP for boat = 0.3989
+AP for bottle = 0.1817
+AP for bus = 0.6707
+AP for car = 0.6120
+AP for cat = 0.6896
+AP for chair = 0.2574
+AP for cow = 0.5105
+AP for diningtable = 0.5809
+AP for dog = 0.6595
+AP for horse = 0.7308
+AP for motorbike = 0.6273
+AP for person = 0.5519
+AP for pottedplant = 0.2394
+AP for sheep = 0.4869
+AP for sofa = 0.5197
+AP for train = 0.6974
+AP for tvmonitor = 0.5022
+Mean AP = 0.5289
 ```
 
 ### Demo
