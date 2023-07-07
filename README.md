@@ -258,6 +258,7 @@ python demo.py -ct 0.2 configs/yolov1_s14_voc.cfg outputs/yolov1_s14_voc/model_b
 ## Thanks
 
 * [abeardear/pytorch-YOLO-v1](https://github.com/abeardear/pytorch-YOLO-v1)
+* [ultralytics/yolov5](https://github.com/ultralytics/yolov5)
 * [zjykzj/YOLOv2](https://github.com/zjykzj/YOLOv2)
 * [zjykzj/anchor-boxes](https://github.com/zjykzj/anchor-boxes)
 * [zjykzj/vocdev](https://github.com/zjykzj/vocdev)
