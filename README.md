@@ -89,6 +89,8 @@
 
 ## Latest News
 
+* ***[2023/07/07][v0.4.0](https://github.com/zjykzj/YOLOv1/releases/tag/v0.4.0). Add [ultralytics/yolov5](https://github.com/ultralytics/yolov5)([485da42](https://github.com/ultralytics/yolov5/commit/485da42273839d20ea6bdaf142fd02c1027aba61)) transforms.***
+  * **After this update, the implementation of zjykzj/YOLOv1 has completely surpassed the training results of the paper**
 * ***[2023/06/26][v0.3.2](https://github.com/zjykzj/YOLOv1/releases/tag/v0.3.2). Refactor data module.***
 * ***[2023/05/16][v0.3.1](https://github.com/zjykzj/YOLOv1/releases/tag/v0.3.1). Add `IGNORE_THRESH` in YOLOv1Loss and reset `lambda_*` based on the YOLOv1 paper.***
   * **In this version, the test results on the VOC dataset have exceeded the paper implementation.**
