@@ -48,7 +48,11 @@ class Albumentations:
 
             LOGGER.info(prefix + ', '.join(f'{x}'.replace('always_apply=False, ', '') for x in T if x.p))
         except ImportError:  # package not installed, skip
-            pass
+            LOGGER.info("There is not albumentations installed!")
+            exit(-1)
+            # ImportError: cannot import name 'Concatenate' from 'typing_extensions' (/home/zj/anaconda3/envs/yolov5/lib/python3.8/site-packages/typing_extensions.py)
+            # https://blog.csdn.net/qq_54000767/article/details/129292127
+            # pip install -U typing_extensions
         except Exception as e:
             LOGGER.info(f'{prefix}{e}')
 
